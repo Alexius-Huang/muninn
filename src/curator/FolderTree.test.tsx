@@ -43,9 +43,9 @@ describe('FolderTree', () => {
       makeFolder('Archive', '/Archive'),
       makeFolder('misc', '/misc'),
     ]);
-    render(<FolderTree token="tok" activePath={null} onOpen={onOpen} />);
+    render(<FolderTree activePath={null} onOpen={onOpen} />);
     await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument());
-    expect(mockListFolderAll).toHaveBeenCalledWith('', 'tok');
+    expect(mockListFolderAll).toHaveBeenCalledWith('');
     const buttons = screen.getAllByRole('button', { name: /Expand|Collapse/ });
     const names = buttons.map((b) => b.textContent?.replace('📁 ', '').replace(/[▶▼…]/g, '').trim());
     expect(names).toEqual(['Archive', 'misc', 'Photos']);
@@ -57,7 +57,7 @@ describe('FolderTree', () => {
       makeFile('readme.txt', '/readme.txt'),
       makeFile('cover.jpg', '/cover.jpg'),
     ]);
-    render(<FolderTree token="tok" activePath={null} onOpen={onOpen} />);
+    render(<FolderTree activePath={null} onOpen={onOpen} />);
     await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument());
     expect(screen.getByText(/Photos/)).toBeInTheDocument();
     expect(screen.queryByText('readme.txt')).not.toBeInTheDocument();
@@ -66,9 +66,8 @@ describe('FolderTree', () => {
 
   it('should show a per-node loading indicator while children are fetching', async () => {
     let resolveRoot!: (entries: DropboxEntry[]) => void;
-    mockListFolderAll
-      .mockReturnValueOnce(new Promise<DropboxEntry[]>((r) => { resolveRoot = r; }));
-    render(<FolderTree token="tok" activePath={null} onOpen={onOpen} />);
+    mockListFolderAll.mockReturnValueOnce(new Promise<DropboxEntry[]>((r) => { resolveRoot = r; }));
+    render(<FolderTree activePath={null} onOpen={onOpen} />);
     expect(screen.getByText('Loading…')).toBeInTheDocument();
     resolveRoot([]);
     await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument());
@@ -79,11 +78,11 @@ describe('FolderTree', () => {
     mockListFolderAll
       .mockResolvedValueOnce([makeFolder('Photos', '/Photos')])
       .mockResolvedValueOnce([makeFolder('Lyon', '/Photos/Lyon')]);
-    render(<FolderTree token="tok" activePath={null} onOpen={onOpen} />);
+    render(<FolderTree activePath={null} onOpen={onOpen} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Expand Photos' })).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'Expand Photos' }));
-    await waitFor(() => expect(mockListFolderAll).toHaveBeenCalledWith('/Photos', 'tok'));
+    await waitFor(() => expect(mockListFolderAll).toHaveBeenCalledWith('/Photos'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Expand Lyon' })).toBeInTheDocument());
 
     // Collapse then re-expand — should not refetch
@@ -97,7 +96,7 @@ describe('FolderTree', () => {
     mockListFolderAll
       .mockResolvedValueOnce([makeFolder('Photos', '/Photos')])
       .mockResolvedValueOnce([makeFolder('Lyon', '/Photos/Lyon')]);
-    render(<FolderTree token="tok" activePath={null} onOpen={onOpen} />);
+    render(<FolderTree activePath={null} onOpen={onOpen} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Expand Photos' })).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'Expand Photos' }));
@@ -115,14 +114,12 @@ describe('FolderTree', () => {
     mockListFolderAll
       .mockResolvedValueOnce([makeFolder('Photos', '/Photos')])
       .mockResolvedValueOnce(photosChildren);
-    render(<FolderTree token="tok" activePath={null} onOpen={onOpen} />);
+    render(<FolderTree activePath={null} onOpen={onOpen} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Expand Photos' })).toBeInTheDocument());
 
-    // Expand Photos first to populate its entry cache
     await user.click(screen.getByRole('button', { name: 'Expand Photos' }));
-    await waitFor(() => expect(mockListFolderAll).toHaveBeenCalledWith('/Photos', 'tok'));
+    await waitFor(() => expect(mockListFolderAll).toHaveBeenCalledWith('/Photos'));
 
-    // Click Open → uses cached entries, no further fetch
     await user.click(screen.getByRole('button', { name: 'Open Photos' }));
     expect(onOpen).toHaveBeenCalledWith('/Photos', photosChildren);
     expect(mockListFolderAll).toHaveBeenCalledTimes(2); // root + expand only
@@ -135,15 +132,12 @@ describe('FolderTree', () => {
       .mockResolvedValueOnce([makeFolder('Photos', '/Photos')])
       .mockResolvedValueOnce(photosEntries);
 
-    // Render with Photos not yet expanded
-    render(<FolderTree token="tok" activePath={null} onOpen={onOpen} />);
+    render(<FolderTree activePath={null} onOpen={onOpen} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open Photos' })).toBeInTheDocument());
 
-    // Photos node has no cached entries yet (root load only fetched root children, not Photos children)
-    // Click Open directly without expanding first
     await user.click(screen.getByRole('button', { name: 'Open Photos' }));
     await waitFor(() => expect(onOpen).toHaveBeenCalledWith('/Photos', photosEntries));
-    expect(mockListFolderAll).toHaveBeenCalledWith('/Photos', 'tok');
+    expect(mockListFolderAll).toHaveBeenCalledWith('/Photos');
   });
 
   it('should highlight the row whose path equals activePath', async () => {
@@ -151,7 +145,7 @@ describe('FolderTree', () => {
       makeFolder('Photos', '/Photos'),
       makeFolder('Videos', '/Videos'),
     ]);
-    render(<FolderTree token="tok" activePath="/Photos" onOpen={onOpen} />);
+    render(<FolderTree activePath="/Photos" onOpen={onOpen} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Expand Photos' })).toBeInTheDocument());
 
     const photosBtn = screen.getByRole('button', { name: 'Expand Photos' });
@@ -168,7 +162,7 @@ describe('FolderTree', () => {
     mockListFolderAll
       .mockResolvedValueOnce([makeFolder('Photos', '/Photos')])
       .mockRejectedValueOnce(new DropboxApiError('path/not_found/...', 409));
-    render(<FolderTree token="tok" activePath={null} onOpen={onOpen} />);
+    render(<FolderTree activePath={null} onOpen={onOpen} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Expand Photos' })).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'Expand Photos' }));

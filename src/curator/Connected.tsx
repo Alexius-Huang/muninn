@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { DropboxAccount, DropboxEntry } from '../dropbox/client';
-import { deleteDropboxToken } from '../auth/keychain';
+import { disconnect } from '../auth/dropboxAuth';
 import { FolderTree } from './FolderTree';
 import { ThumbnailGrid, sortFiles } from './ThumbnailGrid';
 import { PreviewPanel } from './PreviewPanel';
@@ -9,7 +9,6 @@ import { useCurationState } from './useCurationState';
 
 type Props = {
   account: DropboxAccount;
-  token: string;
   onDisconnect: () => void;
 };
 
@@ -28,7 +27,7 @@ function EmptyState() {
   );
 }
 
-export function Connected({ account, token, onDisconnect }: Props) {
+export function Connected({ account, onDisconnect }: Props) {
   const [active, setActive] = useState<Active | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(240);
@@ -36,14 +35,14 @@ export function Connected({ account, token, onDisconnect }: Props) {
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
-  const cache = useThumbnailCache(token);
+  const cache = useThumbnailCache();
   const { flags, setFlag } = useCurationState(active?.path ?? null);
 
   const files = active ? sortFiles(active.entries) : [];
 
   async function handleDisconnect() {
-    if (!window.confirm('Disconnect this Dropbox account? You will need to paste the token again to reconnect.')) return;
-    await deleteDropboxToken();
+    if (!window.confirm('Disconnect this Dropbox account?')) return;
+    await disconnect();
     onDisconnect();
   }
 
@@ -73,7 +72,6 @@ export function Connected({ account, token, onDisconnect }: Props) {
 
     function onMove(ev: MouseEvent) {
       if (!previewDragRef.current) return;
-      // dragging left increases panel width (panel is on the right)
       const next = previewDragRef.current.startWidth - (ev.clientX - previewDragRef.current.startX);
       setPreviewWidth(Math.max(MIN_PREVIEW, Math.min(MAX_PREVIEW, next)));
     }
@@ -131,7 +129,6 @@ export function Connected({ account, token, onDisconnect }: Props) {
           className="shrink-0 overflow-y-auto bg-nord-0"
         >
           <FolderTree
-            token={token}
             activePath={active?.path ?? null}
             onOpen={handleOpen}
           />
@@ -172,7 +169,6 @@ export function Connected({ account, token, onDisconnect }: Props) {
                 total={files.length}
                 flag={flags[selectedFile.path_lower]}
                 placeholderDataUrl={placeholderDataUrl}
-                token={token}
                 width={previewWidth}
                 onClose={() => setSelectedIndex(null)}
                 onNavigate={handleNavigate}

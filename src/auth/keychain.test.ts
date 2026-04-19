@@ -4,40 +4,62 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockInvoke } = vi.hoisted(() => ({ mockInvoke: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: mockInvoke }));
 
-import { getDropboxToken, setDropboxToken, deleteDropboxToken } from './keychain';
+import { getAuth, setAuth, deleteAuth, deleteLegacyToken } from './keychain';
+import type { AuthTokens } from './oauth';
+
+const TOKENS: AuthTokens = {
+  access_token: 'at',
+  refresh_token: 'rt',
+  expires_at: 9999999999999,
+};
 
 beforeEach(() => {
   mockInvoke.mockReset();
 });
 
-describe('getDropboxToken', () => {
-  it('should call get_dropbox_token and return null when no entry', async () => {
+describe('getAuth', () => {
+  it('should call get_dropbox_auth and return null when no entry', async () => {
     mockInvoke.mockResolvedValue(null);
-    const result = await getDropboxToken();
-    expect(mockInvoke).toHaveBeenCalledWith('get_dropbox_token');
+    const result = await getAuth();
+    expect(mockInvoke).toHaveBeenCalledWith('get_dropbox_auth');
     expect(result).toBeNull();
   });
 
-  it('should call get_dropbox_token and return the stored string', async () => {
-    mockInvoke.mockResolvedValue('sl.my-token');
-    const result = await getDropboxToken();
-    expect(mockInvoke).toHaveBeenCalledWith('get_dropbox_token');
-    expect(result).toBe('sl.my-token');
+  it('should parse and return stored AuthTokens', async () => {
+    mockInvoke.mockResolvedValue(JSON.stringify(TOKENS));
+    const result = await getAuth();
+    expect(result).toEqual(TOKENS);
+  });
+
+  it('should return null when stored value is invalid JSON', async () => {
+    mockInvoke.mockResolvedValue('not-json');
+    const result = await getAuth();
+    expect(result).toBeNull();
   });
 });
 
-describe('setDropboxToken', () => {
-  it('should call set_dropbox_token with { token }', async () => {
-    mockInvoke.mockResolvedValue(null);
-    await setDropboxToken('sl.my-token');
-    expect(mockInvoke).toHaveBeenCalledWith('set_dropbox_token', { token: 'sl.my-token' });
+describe('setAuth', () => {
+  it('should call set_dropbox_auth with JSON-stringified tokens', async () => {
+    mockInvoke.mockResolvedValue(undefined);
+    await setAuth(TOKENS);
+    expect(mockInvoke).toHaveBeenCalledWith('set_dropbox_auth', {
+      json: JSON.stringify(TOKENS),
+    });
   });
 });
 
-describe('deleteDropboxToken', () => {
-  it('should call delete_dropbox_token with no extra args', async () => {
-    mockInvoke.mockResolvedValue(null);
-    await deleteDropboxToken();
-    expect(mockInvoke).toHaveBeenCalledWith('delete_dropbox_token');
+describe('deleteAuth', () => {
+  it('should call delete_dropbox_auth', async () => {
+    mockInvoke.mockResolvedValue(undefined);
+    await deleteAuth();
+    expect(mockInvoke).toHaveBeenCalledWith('delete_dropbox_auth');
+  });
+});
+
+describe('deleteLegacyToken', () => {
+  it('should call delete_legacy_dropbox_token', async () => {
+    mockInvoke.mockResolvedValue(undefined);
+    await deleteLegacyToken();
+    expect(mockInvoke).toHaveBeenCalledWith('delete_legacy_dropbox_token');
   });
 });

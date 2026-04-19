@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getDropboxToken, deleteDropboxToken } from './auth/keychain';
-import { validateToken, DropboxAuthError, DropboxNetworkError } from './dropbox/client';
+import { init, isAuthenticated, onDisconnect } from './auth/dropboxAuth';
+import { validateToken, DropboxNetworkError } from './dropbox/client';
 import type { DropboxAccount } from './dropbox/client';
 import { SetupScreen } from './auth/SetupScreen';
 import { Connected } from './curator/Connected';
@@ -8,47 +8,43 @@ import { Connected } from './curator/Connected';
 type AppState =
   | { status: 'loading' }
   | { status: 'setup' }
-  | { status: 'connected'; account: DropboxAccount; token: string };
+  | { status: 'connected'; account: DropboxAccount };
 
 function App() {
   const [state, setState] = useState<AppState>({ status: 'loading' });
 
   useEffect(() => {
-    async function init() {
-      let token: string | null;
-      try {
-        token = await getDropboxToken();
-      } catch (e) {
-        setState({ status: 'setup' });
-        return;
-      }
+    async function boot() {
+      await init();
 
-      if (!token) {
+      if (!isAuthenticated()) {
         setState({ status: 'setup' });
         return;
       }
 
       try {
-        const account = await validateToken(token);
-        setState({ status: 'connected', account, token });
+        const account = await validateToken();
+        setState({ status: 'connected', account });
       } catch (err) {
-        if (err instanceof DropboxAuthError) {
-          await deleteDropboxToken();
-          setState({ status: 'setup' });
-        } else if (err instanceof DropboxNetworkError) {
+        if (err instanceof DropboxNetworkError) {
+          // Offline at launch — proceed as connected with a synthetic account
           const syntheticAccount: DropboxAccount = {
             account_id: '',
             name: { display_name: 'Dropbox' },
             email: '',
           };
-          setState({ status: 'connected', account: syntheticAccount, token });
+          setState({ status: 'connected', account: syntheticAccount });
         } else {
           setState({ status: 'setup' });
         }
       }
     }
 
-    init();
+    boot();
+  }, []);
+
+  useEffect(() => {
+    return onDisconnect(() => setState({ status: 'setup' }));
   }, []);
 
   if (state.status === 'loading') {
@@ -62,7 +58,7 @@ function App() {
   if (state.status === 'setup') {
     return (
       <SetupScreen
-        onConnect={(account, token) => setState({ status: 'connected', account, token })}
+        onConnect={(account) => setState({ status: 'connected', account })}
       />
     );
   }
@@ -70,7 +66,6 @@ function App() {
   return (
     <Connected
       account={state.account}
-      token={state.token}
       onDisconnect={() => setState({ status: 'setup' })}
     />
   );

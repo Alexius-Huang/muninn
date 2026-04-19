@@ -4,10 +4,13 @@ mod keychain;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .plugin(tauri_plugin_deep_link::init())
+    .plugin(tauri_plugin_opener::init())
     .invoke_handler(tauri::generate_handler![
-      keychain::get_dropbox_token,
-      keychain::set_dropbox_token,
-      keychain::delete_dropbox_token,
+      keychain::get_dropbox_auth,
+      keychain::set_dropbox_auth,
+      keychain::delete_dropbox_auth,
+      keychain::delete_legacy_dropbox_token,
       curation::read_curation,
       curation::write_curation,
     ])

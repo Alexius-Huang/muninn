@@ -1,3 +1,5 @@
+import { authFetch, DropboxRefreshError } from '../auth/dropboxAuth';
+
 export type DropboxAccount = {
   account_id: string;
   name: { display_name: string };
@@ -46,9 +48,11 @@ export class DropboxApiError extends Error {
   }
 }
 
+export { DropboxRefreshError };
+
 async function parseError(resp: Response): Promise<Error> {
   if (resp.status === 401) {
-    return new DropboxAuthError('This token was rejected by Dropbox. Double-check it and try again.');
+    return new DropboxAuthError('Session expired — please reconnect.');
   }
   let summary: string | undefined;
   try {
@@ -60,23 +64,21 @@ async function parseError(resp: Response): Promise<Error> {
   return new DropboxApiError(summary || resp.statusText || 'Dropbox request failed', resp.status);
 }
 
-export async function validateToken(token: string): Promise<DropboxAccount> {
+export async function validateToken(): Promise<DropboxAccount> {
   let resp: Response;
   try {
-    resp = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
+    resp = await authFetch('https://api.dropboxapi.com/2/users/get_current_account', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: 'null',
     });
   } catch (e) {
+    if (e instanceof DropboxRefreshError) throw e;
     throw new DropboxNetworkError((e as Error).message);
   }
 
   if (resp.status === 401) {
-    throw new DropboxAuthError('This token was rejected by Dropbox. Double-check it and try again.');
+    throw new DropboxAuthError('Session expired — please reconnect.');
   }
   if (!resp.ok) {
     const body = await resp.text();
@@ -87,42 +89,33 @@ export async function validateToken(token: string): Promise<DropboxAccount> {
 
 type ListFolderResult = { entries: DropboxEntry[]; cursor: string; has_more: boolean };
 
-async function callDropbox(
-  url: string,
-  body: unknown,
-  token: string,
-): Promise<ListFolderResult> {
+async function callDropbox(url: string, body: unknown): Promise<ListFolderResult> {
   let resp: Response;
   try {
-    resp = await fetch(url, {
+    resp = await authFetch(url, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
   } catch (e) {
+    if (e instanceof DropboxRefreshError) throw e;
     throw new DropboxNetworkError((e as Error).message);
   }
   if (!resp.ok) throw await parseError(resp);
   return resp.json() as Promise<ListFolderResult>;
 }
 
-export function listFolder(path: string, token: string): Promise<ListFolderResult> {
-  return callDropbox(
-    'https://api.dropboxapi.com/2/files/list_folder',
-    { path, recursive: false, include_media_info: false, limit: 2000 },
-    token,
-  );
+export function listFolder(path: string): Promise<ListFolderResult> {
+  return callDropbox('https://api.dropboxapi.com/2/files/list_folder', {
+    path,
+    recursive: false,
+    include_media_info: false,
+    limit: 2000,
+  });
 }
 
-export function listFolderContinue(cursor: string, token: string): Promise<ListFolderResult> {
-  return callDropbox(
-    'https://api.dropboxapi.com/2/files/list_folder/continue',
-    { cursor },
-    token,
-  );
+export function listFolderContinue(cursor: string): Promise<ListFolderResult> {
+  return callDropbox('https://api.dropboxapi.com/2/files/list_folder/continue', { cursor });
 }
 
 export type ThumbnailResult =
@@ -133,26 +126,21 @@ type RawThumbnailEntry =
   | { '.tag': 'success'; metadata: { path_lower: string }; thumbnail: string }
   | { '.tag': 'failure'; failure: { '.tag': string } };
 
-export async function getThumbnailBatch(
-  paths: string[],
-  token: string,
-): Promise<ThumbnailResult[]> {
+export async function getThumbnailBatch(paths: string[]): Promise<ThumbnailResult[]> {
   if (paths.length > 25) {
     throw new Error('getThumbnailBatch: max 25 paths per call');
   }
   let resp: Response;
   try {
-    resp = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail_batch', {
+    resp = await authFetch('https://content.dropboxapi.com/2/files/get_thumbnail_batch', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         entries: paths.map((path) => ({ path, format: 'jpeg', size: 'w256h256', mode: 'strict' })),
       }),
     });
   } catch (e) {
+    if (e instanceof DropboxRefreshError) throw e;
     throw new DropboxNetworkError((e as Error).message);
   }
   if (!resp.ok) throw await parseError(resp);
@@ -173,13 +161,12 @@ export async function getThumbnailBatch(
   });
 }
 
-export async function getPreview(pathDisplay: string, token: string): Promise<string> {
+export async function getPreview(pathDisplay: string): Promise<string> {
   let resp: Response;
   try {
-    resp = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail_v2', {
+    resp = await authFetch('https://content.dropboxapi.com/2/files/get_thumbnail_v2', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
         'Dropbox-API-Arg': JSON.stringify({
           resource: { '.tag': 'path', path: pathDisplay },
           format: 'jpeg',
@@ -189,6 +176,7 @@ export async function getPreview(pathDisplay: string, token: string): Promise<st
       },
     });
   } catch (e) {
+    if (e instanceof DropboxRefreshError) throw e;
     throw new DropboxNetworkError((e as Error).message);
   }
   if (!resp.ok) throw await parseError(resp);
@@ -201,12 +189,12 @@ export async function getPreview(pathDisplay: string, token: string): Promise<st
   });
 }
 
-export async function listFolderAll(path: string, token: string): Promise<DropboxEntry[]> {
+export async function listFolderAll(path: string): Promise<DropboxEntry[]> {
   const all: DropboxEntry[] = [];
-  let result = await listFolder(path, token);
+  let result = await listFolder(path);
   all.push(...result.entries);
   while (result.has_more) {
-    result = await listFolderContinue(result.cursor, token);
+    result = await listFolderContinue(result.cursor);
     all.push(...result.entries);
   }
   return all;

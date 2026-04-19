@@ -16,7 +16,7 @@ beforeEach(() => {
 
 describe('useThumbnailCache', () => {
   it('should mark a newly requested path as loading synchronously', () => {
-    const { result } = renderHook(() => useThumbnailCache('tok'));
+    const { result } = renderHook(() => useThumbnailCache());
     const state = result.current.request('/Photos/a.jpg');
     expect(state).toEqual({ tag: 'loading' });
   });
@@ -25,7 +25,7 @@ describe('useThumbnailCache', () => {
     mockGetThumbnailBatch.mockResolvedValue(
       Array.from({ length: 10 }, (_, i) => ({ tag: 'success' as const, path_lower: `/img-${i}.jpg`, dataUrl: `data:image/jpeg;base64,x` })),
     );
-    const { result } = renderHook(() => useThumbnailCache('tok'));
+    const { result } = renderHook(() => useThumbnailCache());
     await act(async () => {
       for (let i = 0; i < 10; i++) result.current.request(`/img-${i}.jpg`);
       await Promise.resolve(); // flush microtask
@@ -37,7 +37,7 @@ describe('useThumbnailCache', () => {
 
   it('should coalesce duplicate requests for the same path into a single batch entry', async () => {
     mockGetThumbnailBatch.mockResolvedValue([{ tag: 'success', path_lower: '/a.jpg', dataUrl: 'data:image/jpeg;base64,x' }]);
-    const { result } = renderHook(() => useThumbnailCache('tok'));
+    const { result } = renderHook(() => useThumbnailCache());
     await act(async () => {
       result.current.request('/a.jpg');
       result.current.request('/a.jpg');
@@ -54,7 +54,7 @@ describe('useThumbnailCache', () => {
     mockGetThumbnailBatch.mockImplementation((paths) =>
       Promise.resolve(paths.map((p) => ({ tag: 'success' as const, path_lower: p.toLowerCase(), dataUrl: 'data:image/jpeg;base64,x' }))),
     );
-    const { result } = renderHook(() => useThumbnailCache('tok'));
+    const { result } = renderHook(() => useThumbnailCache());
     await act(async () => {
       for (let i = 0; i < 60; i++) result.current.request(`/img-${i}.jpg`);
       await Promise.resolve();
@@ -66,7 +66,7 @@ describe('useThumbnailCache', () => {
 
   it('should transition state to success with a dataUrl when the batch resolves', async () => {
     mockGetThumbnailBatch.mockResolvedValue([{ tag: 'success', path_lower: '/a.jpg', dataUrl: 'data:image/jpeg;base64,xyz' }]);
-    const { result } = renderHook(() => useThumbnailCache('tok'));
+    const { result } = renderHook(() => useThumbnailCache());
     await act(async () => {
       result.current.request('/a.jpg');
       await new Promise((r) => setTimeout(r, 0));
@@ -76,7 +76,7 @@ describe('useThumbnailCache', () => {
 
   it('should transition state to error for paths whose batch entry was a failure', async () => {
     mockGetThumbnailBatch.mockResolvedValue([{ tag: 'failure', path_lower: '/raw.cr2', reason: 'unsupported_extension' }]);
-    const { result } = renderHook(() => useThumbnailCache('tok'));
+    const { result } = renderHook(() => useThumbnailCache());
     await act(async () => {
       result.current.request('/RAW.cr2');
       await new Promise((r) => setTimeout(r, 0));
@@ -86,7 +86,7 @@ describe('useThumbnailCache', () => {
 
   it('should transition every path in a batch to error when the whole batch HTTP call rejects', async () => {
     mockGetThumbnailBatch.mockRejectedValue(new Error('Network down'));
-    const { result } = renderHook(() => useThumbnailCache('tok'));
+    const { result } = renderHook(() => useThumbnailCache());
     await act(async () => {
       result.current.request('/a.jpg');
       result.current.request('/b.jpg');
@@ -98,7 +98,7 @@ describe('useThumbnailCache', () => {
 
   it('should return the cached state on subsequent requests (no new fetch)', async () => {
     mockGetThumbnailBatch.mockResolvedValue([{ tag: 'success', path_lower: '/a.jpg', dataUrl: 'data:image/jpeg;base64,x' }]);
-    const { result } = renderHook(() => useThumbnailCache('tok'));
+    const { result } = renderHook(() => useThumbnailCache());
     await act(async () => {
       result.current.request('/a.jpg');
       await new Promise((r) => setTimeout(r, 0));

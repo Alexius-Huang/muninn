@@ -4,11 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { SetupScreen } from './SetupScreen';
 import { DropboxAuthError, DropboxNetworkError } from '../dropbox/client';
 
-const mockSetDropboxToken = vi.fn();
+const mockConnect = vi.fn();
 const mockValidateToken = vi.fn();
 
-vi.mock('./keychain', () => ({
-  setDropboxToken: (...args: unknown[]) => mockSetDropboxToken(...args),
+vi.mock('./dropboxAuth', () => ({
+  connect: (...args: unknown[]) => mockConnect(...args),
 }));
 
 vi.mock('../dropbox/client', async (importOriginal) => {
@@ -26,72 +26,83 @@ const FAKE_ACCOUNT = {
 };
 
 beforeEach(() => {
-  mockSetDropboxToken.mockReset();
+  mockConnect.mockReset();
   mockValidateToken.mockReset();
 });
 
 describe('SetupScreen', () => {
-  it('should call onConnect after a successful token submission', async () => {
+  it('should render a Connect Dropbox button', () => {
+    render(<SetupScreen onConnect={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /connect dropbox/i })).toBeInTheDocument();
+  });
+
+  it('should not render a token input field', () => {
+    render(<SetupScreen onConnect={vi.fn()} />);
+    expect(screen.queryByLabelText(/access token/i)).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('should call onConnect after a successful authorization', async () => {
     const user = userEvent.setup();
     const onConnect = vi.fn();
+    mockConnect.mockResolvedValue(undefined);
     mockValidateToken.mockResolvedValue(FAKE_ACCOUNT);
-    mockSetDropboxToken.mockResolvedValue(undefined);
 
     render(<SetupScreen onConnect={onConnect} />);
+    await user.click(screen.getByRole('button', { name: /connect dropbox/i }));
 
-    await user.type(screen.getByLabelText(/access token/i), 'sl.valid-token');
-    await user.click(screen.getByRole('button', { name: /connect/i }));
-
-    await waitFor(() => expect(onConnect).toHaveBeenCalledWith(FAKE_ACCOUNT, 'sl.valid-token'));
-    expect(mockSetDropboxToken).toHaveBeenCalledWith('sl.valid-token');
+    await waitFor(() => expect(onConnect).toHaveBeenCalledWith(FAKE_ACCOUNT));
   });
 
-  it('should show an error and not persist when validation rejects with a Dropbox auth error', async () => {
+  it('should show Connecting… while the promise is pending', async () => {
     const user = userEvent.setup();
-    const onConnect = vi.fn();
-    mockValidateToken.mockRejectedValue(
-      new DropboxAuthError('This token was rejected by Dropbox. Double-check it and try again.')
-    );
-
-    render(<SetupScreen onConnect={onConnect} />);
-
-    await user.type(screen.getByLabelText(/access token/i), 'sl.bad-token');
-    await user.click(screen.getByRole('button', { name: /connect/i }));
-
-    await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(/rejected by Dropbox/i)
-    );
-    expect(mockSetDropboxToken).not.toHaveBeenCalled();
-    expect(onConnect).not.toHaveBeenCalled();
-  });
-
-  it('should disable the submit button while validating', async () => {
-    const user = userEvent.setup();
-    let resolveValidate!: (v: unknown) => void;
-    mockValidateToken.mockReturnValue(
-      new Promise((res) => {
-        resolveValidate = res;
-      })
-    );
-    mockSetDropboxToken.mockResolvedValue(undefined);
+    let resolveConnect!: () => void;
+    mockConnect.mockReturnValue(new Promise<void>((res) => { resolveConnect = res; }));
+    mockValidateToken.mockResolvedValue(FAKE_ACCOUNT);
 
     render(<SetupScreen onConnect={vi.fn()} />);
-
-    await user.type(screen.getByLabelText(/access token/i), 'sl.token');
-    await user.click(screen.getByRole('button', { name: /connect/i }));
+    await user.click(screen.getByRole('button', { name: /connect dropbox/i }));
 
     expect(screen.getByRole('button')).toBeDisabled();
-    resolveValidate(FAKE_ACCOUNT);
+    expect(screen.getByRole('button')).toHaveTextContent(/connecting…/i);
+
+    resolveConnect();
   });
 
-  it('should show a network-error message when validateToken throws DropboxNetworkError', async () => {
+  it('should surface a user-friendly error if connect rejects with a generic error', async () => {
     const user = userEvent.setup();
-    mockValidateToken.mockRejectedValue(new DropboxNetworkError('Failed to fetch'));
+    mockConnect.mockRejectedValue(new Error('Authorization timed out'));
 
     render(<SetupScreen onConnect={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: /connect dropbox/i }));
 
-    await user.type(screen.getByLabelText(/access token/i), 'sl.token');
-    await user.click(screen.getByRole('button', { name: /connect/i }));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(/Authorization timed out/i)
+    );
+  });
+
+  it('should surface a DropboxAuthError message', async () => {
+    const user = userEvent.setup();
+    mockConnect.mockResolvedValue(undefined);
+    mockValidateToken.mockRejectedValue(
+      new DropboxAuthError('Session expired — please reconnect.')
+    );
+
+    render(<SetupScreen onConnect={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: /connect dropbox/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(/Session expired/i)
+    );
+  });
+
+  it('should surface a network message on DropboxNetworkError', async () => {
+    const user = userEvent.setup();
+    mockConnect.mockResolvedValue(undefined);
+    mockValidateToken.mockRejectedValue(new DropboxNetworkError('fetch failed'));
+
+    render(<SetupScreen onConnect={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: /connect dropbox/i }));
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(/couldn't reach Dropbox/i)

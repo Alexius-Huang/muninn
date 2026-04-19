@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Connected } from './Connected';
 
-const mockDeleteDropboxToken = vi.fn();
+const mockDisconnect = vi.fn();
 const mockSetFlag = vi.fn();
 
-vi.mock('../auth/keychain', () => ({
-  deleteDropboxToken: (...args: unknown[]) => mockDeleteDropboxToken(...args),
+vi.mock('../auth/dropboxAuth', () => ({
+  disconnect: (...args: unknown[]) => mockDisconnect(...args),
 }));
 
 vi.mock('../dropbox/client', async (importOriginal) => {
@@ -55,15 +55,15 @@ function makeFile(name: string, path: string) {
 }
 
 beforeEach(() => {
-  mockDeleteDropboxToken.mockReset();
-  mockDeleteDropboxToken.mockResolvedValue(undefined);
+  mockDisconnect.mockReset();
+  mockDisconnect.mockResolvedValue(undefined);
   mockSetFlag.mockReset();
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
 describe('Connected', () => {
   it("should render the account's display name and email", () => {
-    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText('alice@example.com')).toBeInTheDocument();
   });
@@ -71,7 +71,7 @@ describe('Connected', () => {
   it('should render the folder tree in the left sidebar on mount', async () => {
     const { listFolderAll } = await import('../dropbox/client');
     vi.mocked(listFolderAll).mockResolvedValue([]);
-    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument());
     expect(document.querySelector('aside')).toBeInTheDocument();
   });
@@ -79,7 +79,7 @@ describe('Connected', () => {
   it('should show the empty-state in the right pane when no folder is active', async () => {
     const { listFolderAll } = await import('../dropbox/client');
     vi.mocked(listFolderAll).mockResolvedValue([]);
-    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument());
     expect(screen.getByText('Select a folder to see its photos')).toBeInTheDocument();
   });
@@ -90,7 +90,7 @@ describe('Connected', () => {
     vi.mocked(listFolderAll).mockResolvedValue([
       { '.tag': 'folder', name: 'Photos', path_display: '/Photos', path_lower: '/photos' },
     ]);
-    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open Photos' })).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Open Photos' }));
     await waitFor(() => expect(screen.getByText(/0 photos in \/Photos/)).toBeInTheDocument());
@@ -103,9 +103,8 @@ describe('Connected', () => {
       { '.tag': 'folder', name: 'Lyon', path_display: '/Lyon', path_lower: '/lyon' },
       makeFile('photo.jpg', '/Lyon/photo.jpg'),
     ]);
-    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open Lyon' })).toBeInTheDocument());
-    // open the folder — listFolderAll returns entries for the folder
     vi.mocked(listFolderAll).mockResolvedValue([makeFile('photo.jpg', '/Lyon/photo.jpg')]);
     await user.click(screen.getByRole('button', { name: 'Open Lyon' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'photo.jpg' })).toBeInTheDocument());
@@ -121,7 +120,7 @@ describe('Connected', () => {
         { '.tag': 'folder', name: 'Lyon', path_display: '/Lyon', path_lower: '/lyon' },
       ])
       .mockResolvedValue([makeFile('photo.jpg', '/Lyon/photo.jpg')]);
-    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open Lyon' })).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Open Lyon' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'photo.jpg' })).toBeInTheDocument());
@@ -134,43 +133,39 @@ describe('Connected', () => {
   it('should close the preview panel when a different folder is opened', async () => {
     const user = userEvent.setup();
     const { listFolderAll } = await import('../dropbox/client');
-    // Root tree shows two folders
     vi.mocked(listFolderAll)
       .mockResolvedValueOnce([
         { '.tag': 'folder', name: 'Lyon', path_display: '/Lyon', path_lower: '/lyon' },
         { '.tag': 'folder', name: 'Paris', path_display: '/Paris', path_lower: '/paris' },
       ])
       .mockResolvedValue([makeFile('photo.jpg', '/Lyon/photo.jpg')]);
-    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open Lyon' })).toBeInTheDocument());
-    // open Lyon
     await user.click(screen.getByRole('button', { name: 'Open Lyon' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'photo.jpg' })).toBeInTheDocument());
-    // click thumbnail to open panel
     await user.click(screen.getByRole('button', { name: 'photo.jpg' }));
     await waitFor(() => expect(screen.getByRole('button', { name: /close preview/i })).toBeInTheDocument());
-    // open Paris — panel should auto-close
     vi.mocked(listFolderAll).mockResolvedValue([]);
     await user.click(screen.getByRole('button', { name: 'Open Paris' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: /close preview/i })).not.toBeInTheDocument());
   });
 
-  it('should delete the token and call onDisconnect when Disconnect is confirmed', async () => {
+  it('should call disconnect and onDisconnect when Disconnect is confirmed', async () => {
     const user = userEvent.setup();
     const onDisconnect = vi.fn();
-    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={onDisconnect} />);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={onDisconnect} />);
     await user.click(screen.getByRole('button', { name: /disconnect/i }));
-    expect(mockDeleteDropboxToken).toHaveBeenCalledOnce();
+    expect(mockDisconnect).toHaveBeenCalledOnce();
     expect(onDisconnect).toHaveBeenCalledOnce();
   });
 
-  it('should not delete anything when the user cancels the confirm dialog', async () => {
+  it('should not disconnect when the user cancels the confirm dialog', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     const user = userEvent.setup();
     const onDisconnect = vi.fn();
-    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={onDisconnect} />);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={onDisconnect} />);
     await user.click(screen.getByRole('button', { name: /disconnect/i }));
-    expect(mockDeleteDropboxToken).not.toHaveBeenCalled();
+    expect(mockDisconnect).not.toHaveBeenCalled();
     expect(onDisconnect).not.toHaveBeenCalled();
   });
 });

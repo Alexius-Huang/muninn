@@ -15,7 +15,6 @@ type Props = {
   total: number;
   flag: Flag | undefined;
   placeholderDataUrl: string | undefined;
-  token: string;
   width: number;
   onClose: () => void;
   onNavigate: (delta: -1 | 1) => void;
@@ -28,7 +27,6 @@ export function PreviewPanel({
   total,
   flag,
   placeholderDataUrl,
-  token,
   width,
   onClose,
   onNavigate,
@@ -41,7 +39,7 @@ export function PreviewPanel({
     pathRef.current = file.path_lower;
     setPreview({ tag: 'loading' });
     let cancelled = false;
-    getPreview(file.path_display, token).then(
+    getPreview(file.path_display).then(
       (dataUrl) => {
         if (!cancelled) setPreview({ tag: 'success', dataUrl });
       },
@@ -52,7 +50,7 @@ export function PreviewPanel({
     return () => {
       cancelled = true;
     };
-  }, [file.path_lower, file.path_display, token]);
+  }, [file.path_lower, file.path_display]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

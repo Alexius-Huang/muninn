@@ -1,16 +1,18 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import App from './App';
 import { DropboxAuthError, DropboxNetworkError } from './dropbox/client';
 
-const mockGetDropboxToken = vi.fn();
-const mockDeleteDropboxToken = vi.fn();
+const mockInit = vi.fn();
+const mockIsAuthenticated = vi.fn();
+const mockOnDisconnect = vi.fn();
 const mockValidateToken = vi.fn();
 
-vi.mock('./auth/keychain', () => ({
-  getDropboxToken: (...args: unknown[]) => mockGetDropboxToken(...args),
-  deleteDropboxToken: (...args: unknown[]) => mockDeleteDropboxToken(...args),
-  setDropboxToken: vi.fn(),
+vi.mock('./auth/dropboxAuth', () => ({
+  init: (...args: unknown[]) => mockInit(...args),
+  isAuthenticated: (...args: unknown[]) => mockIsAuthenticated(...args),
+  onDisconnect: (...args: unknown[]) => mockOnDisconnect(...args),
 }));
 
 vi.mock('./dropbox/client', async (importOriginal) => {
@@ -29,40 +31,63 @@ const FAKE_ACCOUNT = {
 };
 
 beforeEach(() => {
-  mockGetDropboxToken.mockReset();
-  mockDeleteDropboxToken.mockReset();
+  mockInit.mockReset().mockResolvedValue(undefined);
+  mockIsAuthenticated.mockReset();
+  mockOnDisconnect.mockReset().mockReturnValue(() => {});
   mockValidateToken.mockReset();
-  mockDeleteDropboxToken.mockResolvedValue(undefined);
 });
 
 describe('App', () => {
-  it('should show the setup screen when no token is stored', async () => {
-    mockGetDropboxToken.mockResolvedValue(null);
+  it('should show the setup screen when not authenticated', async () => {
+    mockIsAuthenticated.mockReturnValue(false);
     render(<App />);
-    await waitFor(() => expect(screen.getByLabelText(/access token/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /connect dropbox/i })).toBeInTheDocument()
+    );
   });
 
-  it('should show the connected view when a token is stored and validation succeeds', async () => {
-    mockGetDropboxToken.mockResolvedValue('sl.valid-token');
+  it('should show the connected view when authenticated and validation succeeds', async () => {
+    mockIsAuthenticated.mockReturnValue(true);
     mockValidateToken.mockResolvedValue(FAKE_ACCOUNT);
     render(<App />);
     await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument());
   });
 
-  it('should clear the Keychain and show setup when the stored token is rejected by Dropbox', async () => {
-    mockGetDropboxToken.mockResolvedValue('sl.expired-token');
+  it('should show the setup screen when validateToken throws DropboxAuthError', async () => {
+    mockIsAuthenticated.mockReturnValue(true);
     mockValidateToken.mockRejectedValue(new DropboxAuthError('Rejected'));
     render(<App />);
-    await waitFor(() => expect(screen.getByLabelText(/access token/i)).toBeInTheDocument());
-    expect(mockDeleteDropboxToken).toHaveBeenCalledOnce();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /connect dropbox/i })).toBeInTheDocument()
+    );
   });
 
-  it('should show the connected view with a synthetic account when validation throws a network error', async () => {
-    mockGetDropboxToken.mockResolvedValue('sl.valid-token');
+  it('should show the connected view with a synthetic account when validation throws DropboxNetworkError', async () => {
+    mockIsAuthenticated.mockReturnValue(true);
     mockValidateToken.mockRejectedValue(new DropboxNetworkError('offline'));
     render(<App />);
-    // synthetic account display_name is 'Dropbox' — shown in header; breadcrumb also renders Dropbox
-    await waitFor(() => expect(screen.getAllByText('Dropbox').length).toBeGreaterThanOrEqual(1));
-    expect(screen.getByRole('button', { name: /disconnect/i })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /disconnect/i })).toBeInTheDocument()
+    );
+  });
+
+  it('should drop back to setup when onDisconnect fires', async () => {
+    mockIsAuthenticated.mockReturnValue(true);
+    mockValidateToken.mockResolvedValue(FAKE_ACCOUNT);
+    let capturedCb: (() => void) | null = null;
+    mockOnDisconnect.mockImplementation((cb: () => void) => {
+      capturedCb = cb;
+      return () => {};
+    });
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument());
+
+    // fire the disconnect event
+    capturedCb!();
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /connect dropbox/i })).toBeInTheDocument()
+    );
   });
 });

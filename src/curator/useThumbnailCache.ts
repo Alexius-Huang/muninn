@@ -16,11 +16,10 @@ export type ThumbnailCache = {
   peek: (pathLower: string) => ThumbnailState;
 };
 
-export function useThumbnailCache(token: string): ThumbnailCache {
+export function useThumbnailCache(): ThumbnailCache {
   const cacheRef = useRef<Map<string, ThumbnailState>>(new Map());
-  // path_lower → set of subscriber callbacks
   const subsRef = useRef<Map<string, Set<Subscriber>>>(new Map());
-  const pendingRef = useRef<Set<string>>(new Set()); // path_display values to batch-fetch
+  const pendingRef = useRef<Set<string>>(new Set());
   const scheduledRef = useRef(false);
 
   const notify = useCallback((pathLower: string) => {
@@ -35,7 +34,7 @@ export function useThumbnailCache(token: string): ThumbnailCache {
 
     for (let i = 0; i < all.length; i += 25) {
       const chunk = all.slice(i, i + 25);
-      getThumbnailBatch(chunk, token).then(
+      getThumbnailBatch(chunk).then(
         (results) => {
           for (const r of results) {
             if (r.tag === 'success') {
@@ -48,7 +47,6 @@ export function useThumbnailCache(token: string): ThumbnailCache {
           }
         },
         () => {
-          // whole batch failed — mark every path as error
           for (const p of chunk) {
             const key = p.toLowerCase();
             cacheRef.current.set(key, { tag: 'error' });
@@ -57,7 +55,7 @@ export function useThumbnailCache(token: string): ThumbnailCache {
         },
       );
     }
-  }, [token, notify]);
+  }, [notify]);
 
   const request = useCallback(
     (pathDisplay: string): ThumbnailState => {

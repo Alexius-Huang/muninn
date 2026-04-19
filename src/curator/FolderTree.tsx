@@ -53,10 +53,10 @@ function reducer(state: Map<string, NodeState>, action: Action): Map<string, Nod
   }
 }
 
-async function fetchNode(path: string, token: string, dispatch: Dispatch<Action>) {
+async function fetchNode(path: string, dispatch: Dispatch<Action>) {
   dispatch({ type: 'REQUEST', path });
   try {
-    const entries = await listFolderAll(path, token);
+    const entries = await listFolderAll(path);
     dispatch({ type: 'SUCCESS', path, entries });
   } catch (e) {
     dispatch({ type: 'ERROR', path, error: (e as Error).message });
@@ -66,7 +66,6 @@ async function fetchNode(path: string, token: string, dispatch: Dispatch<Action>
 type TreeCtx = {
   state: Map<string, NodeState>;
   dispatch: Dispatch<Action>;
-  token: string;
   activePath: string | null;
   onOpen: (path: string, entries: DropboxEntry[]) => void;
 };
@@ -86,7 +85,7 @@ type NodeProps = {
 };
 
 function FolderTreeNode({ path, name, depth }: NodeProps) {
-  const { state, dispatch, token, activePath, onOpen } = useTree();
+  const { state, dispatch, activePath, onOpen } = useTree();
   const k = nodeKey(path);
   const nodeState = state.get(k) ?? { entries: null, expanded: false, loading: false, error: null };
   const isActive = activePath !== null && k === nodeKey(activePath);
@@ -97,7 +96,7 @@ function FolderTreeNode({ path, name, depth }: NodeProps) {
 
   function handleToggle() {
     if (nodeState.entries === null && !nodeState.loading) {
-      fetchNode(path, token, dispatch);
+      fetchNode(path, dispatch);
     }
     dispatch({ type: 'TOGGLE', path });
   }
@@ -109,7 +108,7 @@ function FolderTreeNode({ path, name, depth }: NodeProps) {
     }
     dispatch({ type: 'REQUEST', path });
     try {
-      const entries = await listFolderAll(path, token);
+      const entries = await listFolderAll(path);
       dispatch({ type: 'SUCCESS', path, entries });
       onOpen(path, entries);
     } catch (e) {
@@ -170,12 +169,11 @@ function FolderTreeNode({ path, name, depth }: NodeProps) {
 }
 
 type Props = {
-  token: string;
   activePath: string | null;
   onOpen: (path: string, entries: DropboxEntry[]) => void;
 };
 
-export function FolderTree({ token, activePath, onOpen }: Props) {
+export function FolderTree({ activePath, onOpen }: Props) {
   const [state, dispatch] = useReducer(
     reducer,
     null,
@@ -183,8 +181,8 @@ export function FolderTree({ token, activePath, onOpen }: Props) {
   );
 
   useEffect(() => {
-    fetchNode('', token, dispatch);
-  }, [token]);
+    fetchNode('', dispatch);
+  }, []);
 
   const rootState = state.get('');
   const rootFolders: DropboxFolder[] = (rootState?.entries ?? [])
@@ -192,7 +190,7 @@ export function FolderTree({ token, activePath, onOpen }: Props) {
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 
   return (
-    <TreeContext.Provider value={{ state, dispatch, token, activePath, onOpen }}>
+    <TreeContext.Provider value={{ state, dispatch, activePath, onOpen }}>
       <div className="py-2 px-1">
         {rootState?.loading && (
           <p className="text-nord-4 text-sm px-2 py-1">Loading…</p>
