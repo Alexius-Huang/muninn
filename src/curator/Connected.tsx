@@ -1,34 +1,58 @@
+import { useState } from 'react';
 import type { DropboxAccount } from '../dropbox/client';
+import type { DropboxEntry } from '../dropbox/client';
 import { deleteDropboxToken } from '../auth/keychain';
+import { FolderPicker } from './FolderPicker';
+import { FileList } from './FileList';
 
 type Props = {
   account: DropboxAccount;
+  token: string;
   onDisconnect: () => void;
 };
 
-export function Connected({ account, onDisconnect }: Props) {
+type Selected = { path: string; entries: DropboxEntry[] };
+
+export function Connected({ account, token, onDisconnect }: Props) {
+  const [selected, setSelected] = useState<Selected | null>(null);
+
   async function handleDisconnect() {
+    if (!window.confirm('Disconnect this Dropbox account? You will need to paste the token again to reconnect.')) return;
     await deleteDropboxToken();
     onDisconnect();
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-950">
-      <div className="w-full max-w-md px-8 py-10 bg-neutral-900 rounded-2xl shadow-xl text-center">
-        <h1 className="text-2xl font-semibold text-white mb-2">Muninn</h1>
-        <p className="text-neutral-400 text-sm mb-1">Connected as</p>
-        <p className="text-white font-medium mb-1">{account.name.display_name}</p>
-        <p className="text-neutral-500 text-sm mb-8">{account.email}</p>
-        <p className="text-neutral-400 text-sm mb-8">
-          Folder picker coming soon — this is the curator placeholder.
-        </p>
+    <div className="min-h-screen flex flex-col bg-neutral-950">
+      <header className="flex items-center justify-between px-6 py-3 bg-neutral-900 border-b border-neutral-800">
+        <div>
+          <span className="text-white font-medium text-sm">{account.name.display_name}</span>
+          {account.email && (
+            <span className="text-neutral-500 text-sm ml-2">{account.email}</span>
+          )}
+        </div>
         <button
           onClick={handleDisconnect}
-          className="px-6 py-2 rounded-lg bg-neutral-700 text-neutral-200 hover:bg-neutral-600 transition-colors text-sm"
+          className="px-4 py-1.5 rounded-lg bg-neutral-700 text-neutral-200 hover:bg-neutral-600 transition-colors text-sm"
         >
           Disconnect
         </button>
-      </div>
+      </header>
+
+      <main className="flex-1 overflow-auto">
+        {selected === null ? (
+          <FolderPicker
+            token={token}
+            onSelect={(path, entries) => setSelected({ path, entries })}
+          />
+        ) : (
+          <FileList
+            path={selected.path}
+            entries={selected.entries}
+            onChange={() => setSelected(null)}
+          />
+        )}
+      </main>
     </div>
   );
 }

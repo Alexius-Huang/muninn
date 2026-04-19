@@ -1,4 +1,5 @@
-import { useState, FormEvent } from 'react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { setDropboxToken } from './keychain';
 import { validateToken, DropboxAuthError, DropboxNetworkError } from '../dropbox/client';
 import type { DropboxAccount } from '../dropbox/client';

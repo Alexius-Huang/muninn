@@ -18,6 +18,7 @@ vi.mock('./dropbox/client', async (importOriginal) => {
   return {
     ...actual,
     validateToken: (...args: unknown[]) => mockValidateToken(...args),
+    listFolderAll: vi.fn().mockResolvedValue([]),
   };
 });
 
@@ -60,6 +61,8 @@ describe('App', () => {
     mockGetDropboxToken.mockResolvedValue('sl.valid-token');
     mockValidateToken.mockRejectedValue(new DropboxNetworkError('offline'));
     render(<App />);
-    await waitFor(() => expect(screen.getByText('Dropbox')).toBeInTheDocument());
+    // synthetic account display_name is 'Dropbox' — shown in header; breadcrumb also renders Dropbox
+    await waitFor(() => expect(screen.getAllByText('Dropbox').length).toBeGreaterThanOrEqual(1));
+    expect(screen.getByRole('button', { name: /disconnect/i })).toBeInTheDocument();
   });
 });

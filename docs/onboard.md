@@ -6,7 +6,7 @@ Muninn is a personal photo curator built as a **native macOS app** using Tauri v
 
 ## Status
 
-active — as of 2026-04-19. Vite + React + Tailwind scaffold complete. Tauri scaffold complete (MUN-6). Dropbox token setup UI + macOS Keychain round-trip complete (MUN-2). Feature work pending — see MUN-3 onward.
+active — as of 2026-04-19. Vite + React + Tailwind scaffold complete. Tauri scaffold complete (MUN-6). Dropbox token setup UI + macOS Keychain round-trip complete (MUN-2). Folder picker + file listing complete (MUN-3). Feature work pending — see MUN-4 onward.
 
 ## Stack
 
@@ -39,7 +39,7 @@ Verify: `rustc --version` (expect 1.77+), `cargo --version`.
 - `src/` — React app source (App.tsx, main.tsx, index.css, setupTests.ts)
   - `src/auth/` — Keychain IPC wrappers + SetupScreen
   - `src/dropbox/` — Dropbox API client (validateToken, etc.)
-  - `src/curator/` — Curator UI (Connected placeholder; real view from MUN-3/4/5)
+  - `src/curator/` — Curator shell (folder picker + file list; thumbnail grid lands in MUN-4)
 - `src-tauri/` — Tauri host (Rust); `src/keychain.rs` holds the 3 Keychain commands
 - `public/` — static assets
 - `docs/` — project documentation

@@ -70,6 +70,7 @@ function App() {
   return (
     <Connected
       account={state.account}
+      token={state.token}
       onDisconnect={() => setState({ status: 'setup' })}
     />
   );
