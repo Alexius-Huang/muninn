@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useReducer } from 'react';
 import type { Dispatch } from 'react';
+import { ChevronDown, ChevronRight, Folder, FolderOpen, ArrowRight } from 'lucide-react';
 import { listFolderAll } from '../dropbox/client';
 import type { DropboxEntry, DropboxFolder } from '../dropbox/client';
 
@@ -129,17 +130,26 @@ function FolderTreeNode({ path, name, depth }: NodeProps) {
           className="flex items-center gap-1 flex-1 min-w-0 text-left"
           aria-label={`${nodeState.expanded ? 'Collapse' : 'Expand'} ${name}`}
         >
-          <span className="shrink-0 w-3 text-nord-4 text-xs">
-            {nodeState.loading ? '…' : nodeState.expanded ? '▼' : '▶'}
+          <span className="shrink-0 text-nord-4">
+            {nodeState.loading
+              ? <ChevronRight size={14} className="opacity-40 animate-pulse" />
+              : nodeState.expanded
+                ? <ChevronDown size={14} />
+                : <ChevronRight size={14} />}
           </span>
-          <span className="truncate">📁 {name}</span>
+          <span className="shrink-0 text-nord-4">
+            {nodeState.expanded
+              ? <FolderOpen size={14} />
+              : <Folder size={14} />}
+          </span>
+          <span className="truncate">{name}</span>
         </button>
         <button
           onClick={handleOpen}
-          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-nord-8 hover:text-nord-7 px-1 rounded"
+          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-nord-8 hover:text-nord-7 px-1 rounded"
           aria-label={`Open ${name}`}
         >
-          Open →
+          <ArrowRight size={13} />
         </button>
       </div>
 
