@@ -35,10 +35,9 @@ type Props = {
   path: string;
   entries: DropboxEntry[];
   token: string;
-  onChange: () => void;
 };
 
-export function ThumbnailGrid({ path, entries, token, onChange }: Props) {
+export function ThumbnailGrid({ path, entries, token }: Props) {
   const files: DropboxFile[] = (entries as DropboxEntry[])
     .filter((e): e is DropboxFile => e['.tag'] === 'file')
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
@@ -82,12 +81,6 @@ export function ThumbnailGrid({ path, entries, token, onChange }: Props) {
             <h2 className="text-nord-6 font-semibold text-lg">
               {files.length} photos in {displayPath}
             </h2>
-            <button
-              onClick={onChange}
-              className="text-nord-8 hover:text-nord-7 text-sm transition-colors"
-            >
-              Change folder
-            </button>
           </div>
         </div>
 

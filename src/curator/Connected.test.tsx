@@ -38,43 +38,39 @@ describe('Connected', () => {
     expect(screen.getByText('alice@example.com')).toBeInTheDocument();
   });
 
-  it('should render the FolderPicker on mount', async () => {
+  it('should render the folder tree in the left sidebar on mount', async () => {
+    const { listFolderAll } = await import('../dropbox/client');
+    vi.mocked(listFolderAll).mockResolvedValue([]);
     render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Select this folder' })).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: 'Dropbox' })).toBeInTheDocument();
+    // Tree mounts and triggers a fetch; wait for loading to settle
+    await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument());
+    // Sidebar is present (aside element)
+    expect(document.querySelector('aside')).toBeInTheDocument();
   });
 
-  it('should switch to ThumbnailGrid after a folder is committed via the picker', async () => {
+  it('should show the empty-state in the right pane when no folder is active', async () => {
+    const { listFolderAll } = await import('../dropbox/client');
+    vi.mocked(listFolderAll).mockResolvedValue([]);
+    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument());
+    expect(screen.getByText('Select a folder to see its photos')).toBeInTheDocument();
+  });
+
+  it('should render ThumbnailGrid after clicking Open on a root folder', async () => {
     const user = userEvent.setup();
-    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Select this folder' })).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: 'Select this folder' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Change folder' })).toBeInTheDocument());
-  });
-
-  it('should render ThumbnailGrid header after a folder is committed', async () => {
-    const { getThumbnailBatch: mockBatch } = await import('../dropbox/client');
-    vi.mocked(mockBatch).mockResolvedValue([]);
-    // mock listFolderAll to return one file so ThumbnailGrid shows "1 photos in"
-    const { listFolderAll: mockList } = await import('../dropbox/client');
-    vi.mocked(mockList).mockResolvedValue([
-      { '.tag': 'file', name: 'a.jpg', path_display: '/Lyon/a.jpg', path_lower: '/lyon/a.jpg', id: 'x', size: 1, server_modified: '' },
+    const { listFolderAll } = await import('../dropbox/client');
+    vi.mocked(listFolderAll).mockResolvedValue([
+      {
+        '.tag': 'folder',
+        name: 'Photos',
+        path_display: '/Photos',
+        path_lower: '/photos',
+      },
     ]);
-    const user = userEvent.setup();
     render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Select this folder' })).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: 'Select this folder' }));
-    await waitFor(() => expect(screen.getByText(/1 photos in/)).toBeInTheDocument());
-  });
-
-  it('should return to the picker when "Change folder" is clicked from ThumbnailGrid', async () => {
-    const user = userEvent.setup();
-    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Select this folder' })).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: 'Select this folder' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Change folder' })).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: 'Change folder' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Select this folder' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Photos' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Open Photos' }));
+    await waitFor(() => expect(screen.getByText(/0 photos in \/Photos/)).toBeInTheDocument());
   });
 
   it('should delete the token and call onDisconnect when Disconnect is confirmed', async () => {

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { ThumbnailGrid } from './ThumbnailGrid';
 import type { DropboxEntry } from '../dropbox/client';
 
@@ -45,14 +44,14 @@ describe('ThumbnailGrid', () => {
   it('should render the photo count and folder path in the header', async () => {
     const entries = [makeFile('a.jpg', '/Lyon/a.jpg'), makeFile('b.jpg', '/Lyon/b.jpg')];
     await act(async () => {
-      render(<ThumbnailGrid path="/Lyon" entries={entries} token="tok" onChange={() => {}} />);
+      render(<ThumbnailGrid path="/Lyon" entries={entries} token="tok" />);
     });
     expect(screen.getByText(/2 photos in \/Lyon/)).toBeInTheDocument();
   });
 
   it('should render "No photos in this folder" with zero file entries', async () => {
     await act(async () => {
-      render(<ThumbnailGrid path="/Empty" entries={[]} token="tok" onChange={() => {}} />);
+      render(<ThumbnailGrid path="/Empty" entries={[]} token="tok" />);
     });
     expect(screen.getByText('No photos in this folder')).toBeInTheDocument();
   });
@@ -60,24 +59,14 @@ describe('ThumbnailGrid', () => {
   it('should render "No photos in this folder" when entries are all folders', async () => {
     const entries = [makeFolder('Subfolder', '/Foo/Subfolder')];
     await act(async () => {
-      render(<ThumbnailGrid path="/Foo" entries={entries} token="tok" onChange={() => {}} />);
+      render(<ThumbnailGrid path="/Foo" entries={entries} token="tok" />);
     });
     expect(screen.getByText('No photos in this folder')).toBeInTheDocument();
   });
 
-  it('should call onChange when the "Change folder" button is clicked', async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    await act(async () => {
-      render(<ThumbnailGrid path="/Lyon" entries={[makeFile('a.jpg', '/Lyon/a.jpg')]} token="tok" onChange={onChange} />);
-    });
-    await user.click(screen.getByRole('button', { name: 'Change folder' }));
-    expect(onChange).toHaveBeenCalledOnce();
-  });
-
   it('should not call getThumbnailBatch when the entry list has zero files', async () => {
     await act(async () => {
-      render(<ThumbnailGrid path="/Empty" entries={[]} token="tok" onChange={() => {}} />);
+      render(<ThumbnailGrid path="/Empty" entries={[]} token="tok" />);
       await new Promise((r) => setTimeout(r, 10));
     });
     expect(mockGetThumbnailBatch).not.toHaveBeenCalled();
@@ -89,7 +78,7 @@ describe('ThumbnailGrid', () => {
       Promise.resolve(paths.map((p) => ({ tag: 'success' as const, path_lower: p.toLowerCase(), dataUrl: 'data:image/jpeg;base64,x' }))),
     );
     await act(async () => {
-      render(<ThumbnailGrid path="/Lyon" entries={entries} token="tok" onChange={() => {}} />);
+      render(<ThumbnailGrid path="/Lyon" entries={entries} token="tok" />);
       await new Promise((r) => setTimeout(r, 20));
     });
     for (const call of mockGetThumbnailBatch.mock.calls) {
