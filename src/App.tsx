@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getDropboxToken, deleteDropboxToken } from './auth/keychain';
-import { validateToken, DropboxAuthError, DropboxNetworkError, DropboxAccount } from './dropbox/client';
+import { validateToken, DropboxAuthError, DropboxNetworkError } from './dropbox/client';
+import type { DropboxAccount } from './dropbox/client';
 import { SetupScreen } from './auth/SetupScreen';
 import { Connected } from './curator/Connected';
 

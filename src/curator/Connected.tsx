@@ -1,4 +1,4 @@
-import { DropboxAccount } from '../dropbox/client';
+import type { DropboxAccount } from '../dropbox/client';
 import { deleteDropboxToken } from '../auth/keychain';
 
 type Props = {

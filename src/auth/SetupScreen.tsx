@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { setDropboxToken } from './keychain';
-import { validateToken, DropboxAuthError, DropboxNetworkError, DropboxAccount } from '../dropbox/client';
+import { validateToken, DropboxAuthError, DropboxNetworkError } from '../dropbox/client';
+import type { DropboxAccount } from '../dropbox/client';
 
 type Props = {
   onConnect: (account: DropboxAccount, token: string) => void;
