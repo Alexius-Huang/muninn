@@ -6,7 +6,7 @@ Muninn is a personal photo curator built as a **native macOS app** using Tauri v
 
 ## Status
 
-active — as of 2026-04-19. Vite + React + Tailwind scaffold complete. Tauri scaffold complete (MUN-6). Feature work pending — see MUN-2 onward.
+active — as of 2026-04-19. Vite + React + Tailwind scaffold complete. Tauri scaffold complete (MUN-6). Dropbox token setup UI + macOS Keychain round-trip complete (MUN-2). Feature work pending — see MUN-3 onward.
 
 ## Stack
 
@@ -37,7 +37,10 @@ Verify: `rustc --version` (expect 1.77+), `cargo --version`.
 ## Structure
 
 - `src/` — React app source (App.tsx, main.tsx, index.css, setupTests.ts)
-- `src-tauri/` — Tauri host (Rust)
+  - `src/auth/` — Keychain IPC wrappers + SetupScreen
+  - `src/dropbox/` — Dropbox API client (validateToken, etc.)
+  - `src/curator/` — Curator UI (Connected placeholder; real view from MUN-3/4/5)
+- `src-tauri/` — Tauri host (Rust); `src/keychain.rs` holds the 3 Keychain commands
 - `public/` — static assets
 - `docs/` — project documentation
 - `.meta/ratatoskr/` — Ratatoskr task metadata (gitignored). Prefix: `MUN`.
@@ -46,7 +49,7 @@ Verify: `rustc --version` (expect 1.77+), `cargo --version`.
 
 - **Native macOS app, not a browser SPA.** Decision pivoted on 2026-04-19 because storing the Dropbox token in localStorage was unsafe and the file system is a much stronger store for curation state. See MUN-1 for architecture summary.
 - **No backend / no sidecar.** Unlike ratatoskr, Muninn does not need a Hono server — Dropbox API calls go straight from the WebView, and persistence uses Tauri plugins (Keychain + fs).
-- **Token in macOS Keychain.** Stored via a Tauri plugin (stronghold / keyring / custom Rust command — to be decided in MUN-2 planning). **Never** store the access token in localStorage, sessionStorage, or any plain file.
+- **Token in macOS Keychain.** Stored under service `com.huang.muninn`, account `dropbox_access_token`, via the `keyring` Rust crate (custom Tauri commands). **Never** store the access token in localStorage, sessionStorage, or any plain file.
 - **Curation state on disk.** Per-folder JSON files under the app's data dir. One file per Dropbox folder, keyed by a hash of the folder path. Human-readable and editable outside the app.
 - **Test folder:** `/Photos/2026-04-12 France, Lyon` — 482 files. Use this for end-to-end manual testing once features land.
 - **Spike artifacts:** `scratch/photo-curator-spike/` has Node scripts that proved Dropbox API works for metadata + thumbnails but not GPS. Do not reuse them; the `.env` there contains a Dropbox token — leave it alone.
