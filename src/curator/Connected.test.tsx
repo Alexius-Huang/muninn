@@ -27,25 +27,14 @@ describe('Connected', () => {
     expect(screen.getByText('alice@example.com')).toBeInTheDocument();
   });
 
-  it('should delete the token and call onDisconnect when the user confirms disconnect', async () => {
+  it('should delete the token and call onDisconnect when Disconnect is clicked', async () => {
     const user = userEvent.setup();
     const onDisconnect = vi.fn();
-    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
 
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={onDisconnect} />);
 
     await user.click(screen.getByRole('button', { name: /disconnect/i }));
     expect(mockDeleteDropboxToken).toHaveBeenCalledOnce();
     expect(onDisconnect).toHaveBeenCalledOnce();
-  });
-
-  it('should not delete anything when the user cancels the confirm dialog', async () => {
-    const user = userEvent.setup();
-    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
-
-    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
-
-    await user.click(screen.getByRole('button', { name: /disconnect/i }));
-    expect(mockDeleteDropboxToken).not.toHaveBeenCalled();
   });
 });

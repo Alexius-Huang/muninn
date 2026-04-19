@@ -8,10 +8,6 @@ type Props = {
 
 export function Connected({ account, onDisconnect }: Props) {
   async function handleDisconnect() {
-    const confirmed = window.confirm(
-      'Disconnect this Dropbox account? You will need to paste the token again to reconnect.'
-    );
-    if (!confirmed) return;
     await deleteDropboxToken();
     onDisconnect();
   }
