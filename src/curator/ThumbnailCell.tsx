@@ -16,7 +16,17 @@ export function ThumbnailCell({ file, state, flag, onClick }: Props) {
       onClick={onClick}
       aria-label={file.name}
     >
-      <div className="relative w-40 h-40 rounded overflow-hidden bg-nord-2 flex items-center justify-center">
+      <div
+        data-testid={flag ? `flag-${flag}` : undefined}
+        className="relative w-40 h-40 rounded overflow-hidden bg-nord-2 flex items-center justify-center transition-shadow duration-200"
+        style={
+          flag === 'keep'
+            ? { boxShadow: '0 0 0 2px var(--color-nord-14), 0 0 10px 2px var(--color-nord-14)' }
+            : flag === 'discard'
+            ? { boxShadow: '0 0 0 2px var(--color-nord-11), 0 0 10px 2px var(--color-nord-11)' }
+            : undefined
+        }
+      >
         {state.tag === 'loading' && (
           <div
             data-testid="thumbnail-skeleton"
@@ -39,22 +49,6 @@ export function ThumbnailCell({ file, state, flag, onClick }: Props) {
           >
             ⚠
           </div>
-        )}
-        {flag === 'keep' && (
-          <span
-            data-testid="flag-keep"
-            className="absolute top-1 right-1 bg-nord-14 text-nord-0 text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center leading-none"
-          >
-            K
-          </span>
-        )}
-        {flag === 'discard' && (
-          <span
-            data-testid="flag-discard"
-            className="absolute top-1 right-1 bg-nord-11 text-nord-6 text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center leading-none"
-          >
-            D
-          </span>
         )}
       </div>
       <p className="text-nord-4 text-xs truncate text-center leading-4">{file.name}</p>

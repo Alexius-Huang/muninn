@@ -19,7 +19,7 @@ type Props = {
   width: number;
   onClose: () => void;
   onNavigate: (delta: -1 | 1) => void;
-  onFlag: (value: Flag) => void;
+  onFlag: (value: Flag | undefined) => void;
 };
 
 export function PreviewPanel({
@@ -60,11 +60,11 @@ export function PreviewPanel({
       switch (e.key) {
         case 'k':
         case 'K':
-          onFlag('keep');
+          onFlag(flag === 'keep' ? undefined : 'keep');
           break;
         case 'd':
         case 'D':
-          onFlag('discard');
+          onFlag(flag === 'discard' ? undefined : 'discard');
           break;
         case 'ArrowLeft':
           e.preventDefault();
@@ -127,7 +127,7 @@ export function PreviewPanel({
       {/* flag controls */}
       <div className="shrink-0 flex items-center justify-center gap-3 px-4 py-3 border-t border-nord-3">
         <button
-          onClick={() => onFlag('keep')}
+          onClick={() => onFlag(flag === 'keep' ? undefined : 'keep')}
           aria-label="Keep (K)"
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
             flag === 'keep'
@@ -139,7 +139,7 @@ export function PreviewPanel({
           Keep
         </button>
         <button
-          onClick={() => onFlag('discard')}
+          onClick={() => onFlag(flag === 'discard' ? undefined : 'discard')}
           aria-label="Discard (D)"
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
             flag === 'discard'

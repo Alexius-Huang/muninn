@@ -3,7 +3,7 @@ import { readCuration, writeCuration, type CurationFlags, type Flag } from './cu
 
 export function useCurationState(folderPath: string | null): {
   flags: CurationFlags;
-  setFlag: (pathLower: string, value: Flag) => void;
+  setFlag: (pathLower: string, value: Flag | undefined) => void;
 } {
   const [flags, setFlags] = useState<CurationFlags>({});
   const flagsRef = useRef<CurationFlags>({});
@@ -48,8 +48,14 @@ export function useCurationState(folderPath: string | null): {
     };
   }, [flush]);
 
-  const setFlag = useCallback((pathLower: string, value: Flag) => {
-    flagsRef.current = { ...flagsRef.current, [pathLower]: value };
+  const setFlag = useCallback((pathLower: string, value: Flag | undefined) => {
+    const next = { ...flagsRef.current };
+    if (value === undefined) {
+      delete next[pathLower];
+    } else {
+      next[pathLower] = value;
+    }
+    flagsRef.current = next;
     setFlags({ ...flagsRef.current });
     dirtyRef.current = true;
 

@@ -43,19 +43,19 @@ describe('ThumbnailCell', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it('should render a keep badge when flag is keep', () => {
+  it('should apply green glow when flag is keep', () => {
     render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} flag="keep" onClick={vi.fn()} />);
     expect(screen.getByTestId('flag-keep')).toBeInTheDocument();
     expect(screen.queryByTestId('flag-discard')).not.toBeInTheDocument();
   });
 
-  it('should render a discard badge when flag is discard', () => {
+  it('should apply red glow when flag is discard', () => {
     render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} flag="discard" onClick={vi.fn()} />);
     expect(screen.getByTestId('flag-discard')).toBeInTheDocument();
     expect(screen.queryByTestId('flag-keep')).not.toBeInTheDocument();
   });
 
-  it('should render no badge when flag is undefined', () => {
+  it('should apply no glow when flag is undefined', () => {
     render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} onClick={vi.fn()} />);
     expect(screen.queryByTestId('flag-keep')).not.toBeInTheDocument();
     expect(screen.queryByTestId('flag-discard')).not.toBeInTheDocument();
