@@ -1,7 +1,7 @@
 export const AUTH_BASE = 'https://www.dropbox.com/oauth2/authorize';
 export const TOKEN_URL = 'https://api.dropbox.com/oauth2/token';
 export const REVOKE_URL = 'https://api.dropboxapi.com/2/auth/token/revoke';
-export const REDIRECT_URI = 'muninn://oauth/callback';
+export const REDIRECT_URI = 'http://localhost:19876';
 
 export type AuthTokens = {
   access_token: string;

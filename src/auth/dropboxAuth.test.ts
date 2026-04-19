@@ -7,7 +7,7 @@ const {
   mockSetAuth,
   mockDeleteAuth,
   mockDeleteLegacyToken,
-  mockOnOpenUrl,
+  mockInvoke,
   mockOpenUrl,
   mockGenerateCodeVerifier,
   mockComputeCodeChallenge,
@@ -20,7 +20,7 @@ const {
   mockSetAuth: vi.fn(),
   mockDeleteAuth: vi.fn(),
   mockDeleteLegacyToken: vi.fn(),
-  mockOnOpenUrl: vi.fn(),
+  mockInvoke: vi.fn(),
   mockOpenUrl: vi.fn(),
   mockGenerateCodeVerifier: vi.fn(),
   mockComputeCodeChallenge: vi.fn(),
@@ -37,8 +37,8 @@ vi.mock('./keychain', () => ({
   deleteLegacyToken: (...a: unknown[]) => mockDeleteLegacyToken(...a),
 }));
 
-vi.mock('@tauri-apps/plugin-deep-link', () => ({
-  onOpenUrl: (...a: unknown[]) => mockOnOpenUrl(...a),
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: (...a: unknown[]) => mockInvoke(...a),
 }));
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
@@ -89,7 +89,7 @@ beforeEach(async () => {
   mockDeleteAuth.mockResolvedValue(undefined);
   mockDeleteLegacyToken.mockResolvedValue(undefined);
   mockOpenUrl.mockResolvedValue(undefined);
-  mockOnOpenUrl.mockResolvedValue(() => {});
+  mockInvoke.mockResolvedValue('');
   await init(); // reset singleton state
 });
 
@@ -183,23 +183,16 @@ describe('authFetch', () => {
 });
 
 describe('connect', () => {
-  it('should run the full connect() flow against mocked deep-link + opener + token endpoint', async () => {
+  it('should run the full connect() flow against mocked invoke + opener + token endpoint', async () => {
     mockGenerateCodeVerifier.mockResolvedValue('verifier123');
     mockComputeCodeChallenge.mockResolvedValue('challenge456');
     mockBuildAuthorizeUrl.mockReturnValue('https://www.dropbox.com/oauth2/authorize?...');
+    mockOpenUrl.mockResolvedValue(undefined);
 
-    // Simulate deep-link callback arriving after connect() opens the browser
-    let capturedHandler: ((urls: string[]) => void) | null = null;
-    mockOnOpenUrl.mockImplementation(async (handler: (urls: string[]) => void) => {
-      capturedHandler = handler;
-      return () => {};
-    });
-    mockOpenUrl.mockImplementation(async () => {
-      // Simulate the browser redirect coming back immediately
+    // invoke returns the callback URL; state is already in sessionStorage by the time invoke is called
+    mockInvoke.mockImplementation(async () => {
       const pending = JSON.parse(sessionStorage.getItem('muninn.oauth.pending') ?? 'null');
-      if (capturedHandler && pending) {
-        await capturedHandler([`muninn://oauth/callback?code=auth_code&state=${pending.state}`]);
-      }
+      return `http://localhost:19876?code=auth_code&state=${pending.state}`;
     });
 
     mockExchangeCodeForTokens.mockResolvedValue(VALID_TOKENS);
@@ -217,17 +210,8 @@ describe('connect', () => {
     mockGenerateCodeVerifier.mockResolvedValue('verifier123');
     mockComputeCodeChallenge.mockResolvedValue('challenge456');
     mockBuildAuthorizeUrl.mockReturnValue('https://www.dropbox.com/oauth2/authorize?...');
-
-    let capturedHandler: ((urls: string[]) => void) | null = null;
-    mockOnOpenUrl.mockImplementation(async (handler: (urls: string[]) => void) => {
-      capturedHandler = handler;
-      return () => {};
-    });
-    mockOpenUrl.mockImplementation(async () => {
-      if (capturedHandler) {
-        await capturedHandler(['muninn://oauth/callback?code=auth_code&state=WRONG_STATE']);
-      }
-    });
+    mockOpenUrl.mockResolvedValue(undefined);
+    mockInvoke.mockResolvedValue('http://localhost:19876?code=auth_code&state=WRONG_STATE');
 
     await expect(connect()).rejects.toThrow(/State mismatch/);
   });
@@ -236,17 +220,11 @@ describe('connect', () => {
     mockGenerateCodeVerifier.mockResolvedValue('verifier123');
     mockComputeCodeChallenge.mockResolvedValue('challenge456');
     mockBuildAuthorizeUrl.mockReturnValue('https://www.dropbox.com/oauth2/authorize?...');
+    mockOpenUrl.mockResolvedValue(undefined);
 
-    let capturedHandler: ((urls: string[]) => void) | null = null;
-    mockOnOpenUrl.mockImplementation(async (handler: (urls: string[]) => void) => {
-      capturedHandler = handler;
-      return () => {};
-    });
-    mockOpenUrl.mockImplementation(async () => {
+    mockInvoke.mockImplementation(async () => {
       const pending = JSON.parse(sessionStorage.getItem('muninn.oauth.pending') ?? 'null');
-      if (capturedHandler && pending) {
-        await capturedHandler([`muninn://oauth/callback?error=access_denied&state=${pending.state}`]);
-      }
+      return `http://localhost:19876?error=access_denied&state=${pending.state}`;
     });
 
     await expect(connect()).rejects.toThrow(/Dropbox declined/);

@@ -1,4 +1,4 @@
-import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
+import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { getAuth, setAuth, deleteAuth, deleteLegacyToken } from './keychain';
 import {
@@ -100,6 +100,8 @@ export async function authFetch(url: string, init?: RequestInit): Promise<Respon
   return resp;
 }
 
+const CALLBACK_PORT = 19876;
+
 export async function connect(): Promise<void> {
   if (!APP_KEY) {
     throw new Error('VITE_DROPBOX_APP_KEY is not configured. Set it in .env.local.');
@@ -113,75 +115,57 @@ export async function connect(): Promise<void> {
 
   const authUrl = buildAuthorizeUrl({ appKey: APP_KEY, codeChallenge: challenge, state });
 
-  return new Promise<void>((resolve, reject) => {
-    let settled = false;
-    let unlisten: (() => void) | null = null;
+  // Start the localhost listener before opening the browser so the port is bound
+  // and ready before Dropbox redirects back.
+  const callbackPromise = invoke<string>('wait_for_oauth_callback', { port: CALLBACK_PORT });
 
-    const timeout = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      sessionStorage.removeItem(OAUTH_PENDING_KEY);
-      if (unlisten) unlisten();
-      reject(new Error('Authorization timed out — please try again.'));
-    }, CONNECT_TIMEOUT_MS);
+  await openUrl(authUrl);
 
-    const handleUrls = async (urls: string[]) => {
-      if (settled) return;
-      const callbackUrl = urls.find((u) => u.startsWith('muninn://oauth/callback'));
-      if (!callbackUrl) return;
+  let callbackUrl: string;
+  try {
+    callbackUrl = await Promise.race([
+      callbackPromise,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Authorization timed out — please try again.')), CONNECT_TIMEOUT_MS)
+      ),
+    ]);
+  } catch (err) {
+    sessionStorage.removeItem(OAUTH_PENDING_KEY);
+    throw err;
+  }
 
-      settled = true;
-      clearTimeout(timeout);
-      if (unlisten) unlisten();
+  try {
+    const parsed = new URL(callbackUrl);
+    const code = parsed.searchParams.get('code');
+    const returnedState = parsed.searchParams.get('state');
+    const error = parsed.searchParams.get('error');
 
-      try {
-        const parsed = new URL(callbackUrl);
-        const code = parsed.searchParams.get('code');
-        const returnedState = parsed.searchParams.get('state');
-        const error = parsed.searchParams.get('error');
+    const pending = JSON.parse(sessionStorage.getItem(OAUTH_PENDING_KEY) ?? 'null') as {
+      verifier: string;
+      state: string;
+    } | null;
+    sessionStorage.removeItem(OAUTH_PENDING_KEY);
 
-        const pending = JSON.parse(sessionStorage.getItem(OAUTH_PENDING_KEY) ?? 'null') as {
-          verifier: string;
-          state: string;
-        } | null;
-        sessionStorage.removeItem(OAUTH_PENDING_KEY);
+    if (error) {
+      throw new Error(`Dropbox declined: ${error}`);
+    }
+    if (!code) {
+      throw new Error('No authorization code in callback');
+    }
+    if (!pending || returnedState !== pending.state) {
+      throw new Error('State mismatch — possible CSRF attack');
+    }
 
-        if (error) {
-          throw new Error(`Dropbox declined: ${error}`);
-        }
-        if (!code) {
-          throw new Error('No authorization code in callback');
-        }
-        if (!pending || returnedState !== pending.state) {
-          throw new Error('State mismatch — possible CSRF attack');
-        }
-
-        const tokens = await exchangeCodeForTokens({
-          appKey: APP_KEY,
-          code,
-          codeVerifier: pending.verifier,
-        });
-        _tokens = tokens;
-        await setAuth(tokens);
-        resolve();
-      } catch (err) {
-        reject(err);
-      }
-    };
-
-    // Register deep-link listener before opening browser
-    onOpenUrl(handleUrls).then((unlistenFn) => {
-      unlisten = unlistenFn;
-      openUrl(authUrl).catch((err) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        if (unlisten) unlisten();
-        sessionStorage.removeItem(OAUTH_PENDING_KEY);
-        reject(err);
-      });
+    const tokens = await exchangeCodeForTokens({
+      appKey: APP_KEY,
+      code,
+      codeVerifier: pending.verifier,
     });
-  });
+    _tokens = tokens;
+    await setAuth(tokens);
+  } catch (err) {
+    throw err;
+  }
 }
 
 export async function disconnect(): Promise<void> {

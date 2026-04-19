@@ -1,5 +1,6 @@
 mod curation;
 mod keychain;
+mod oauth_callback;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -11,6 +12,7 @@ pub fn run() {
       keychain::set_dropbox_auth,
       keychain::delete_dropbox_auth,
       keychain::delete_legacy_dropbox_token,
+      oauth_callback::wait_for_oauth_callback,
       curation::read_curation,
       curation::write_curation,
     ])
