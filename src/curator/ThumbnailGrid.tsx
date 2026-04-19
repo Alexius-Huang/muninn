@@ -5,6 +5,7 @@ import { useThumbnailCache, type ThumbnailCache } from './useThumbnailCache';
 import { ThumbnailCell } from './ThumbnailCell';
 
 const CELL_SIZE = 160;
+const LABEL_HEIGHT = 20; // text-xs (16px) + gap-1 (4px)
 const GAP = 8;
 
 const CacheContext = createContext<ThumbnailCache | null>(null);
@@ -64,11 +65,12 @@ export function ThumbnailGrid({ path, entries, token, onChange }: Props) {
   }, []);
 
   const rowCount = Math.ceil(files.length / columns);
+  const gridWidth = columns * CELL_SIZE + (columns - 1) * GAP;
 
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => CELL_SIZE + GAP,
+    estimateSize: () => CELL_SIZE + LABEL_HEIGHT + GAP,
     overscan: 4,
   });
 
@@ -96,7 +98,12 @@ export function ThumbnailGrid({ path, entries, token, onChange }: Props) {
         ) : (
           <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto">
             <div
-              style={{ height: virtualizer.getTotalSize(), position: 'relative' }}
+              style={{
+                height: virtualizer.getTotalSize() + 16,
+                position: 'relative',
+                width: gridWidth,
+                margin: '0 auto',
+              }}
             >
               {virtualizer.getVirtualItems().map((virtualRow) => {
                 const startIndex = virtualRow.index * columns;
@@ -106,12 +113,11 @@ export function ThumbnailGrid({ path, entries, token, onChange }: Props) {
                     key={virtualRow.key}
                     style={{
                       position: 'absolute',
-                      top: virtualRow.start,
+                      top: virtualRow.start + 16,
                       left: 0,
-                      width: '100%',
+                      width: gridWidth,
                       display: 'flex',
                       gap: GAP,
-                      padding: '0 16px',
                     }}
                   >
                     {rowFiles.map((file) => (
