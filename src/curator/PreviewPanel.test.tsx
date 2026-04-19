@@ -33,6 +33,7 @@ function defaultProps(overrides?: Partial<Parameters<typeof PreviewPanel>[0]>) {
     flag: undefined,
     placeholderDataUrl: undefined,
     token: 'tok',
+    width: 480,
     onClose: vi.fn(),
     onNavigate: vi.fn(),
     onFlag: vi.fn(),

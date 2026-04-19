@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   validateToken,
@@ -224,10 +223,11 @@ describe('getThumbnailBatch', () => {
 
 describe('getPreview', () => {
   function makeBinaryResponse(status: number, bytes: Uint8Array): Response {
+    const blob = new Blob([bytes], { type: 'image/jpeg' });
     return {
       status,
       ok: status >= 200 && status < 300,
-      arrayBuffer: () => Promise.resolve(bytes.buffer as ArrayBuffer),
+      blob: () => Promise.resolve(blob),
       json: () => Promise.resolve({}),
       text: () => Promise.resolve(''),
     } as unknown as Response;

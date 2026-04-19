@@ -16,6 +16,7 @@ type Props = {
   flag: Flag | undefined;
   placeholderDataUrl: string | undefined;
   token: string;
+  width: number;
   onClose: () => void;
   onNavigate: (delta: -1 | 1) => void;
   onFlag: (value: Flag) => void;
@@ -28,6 +29,7 @@ export function PreviewPanel({
   flag,
   placeholderDataUrl,
   token,
+  width,
   onClose,
   onNavigate,
   onFlag,
@@ -85,7 +87,8 @@ export function PreviewPanel({
     preview.tag === 'success' ? preview.dataUrl : (placeholderDataUrl ?? undefined);
 
   return (
-    <aside className="flex flex-col w-[45%] max-w-[720px] min-w-[300px] shrink-0 bg-nord-1 border-l border-nord-3">
+    <aside className="flex flex-col shrink-0 bg-nord-1" style={{ width }}>
+
       {/* header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-nord-3 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -102,18 +105,22 @@ export function PreviewPanel({
       </div>
 
       {/* image area */}
-      <div className="flex-1 min-h-0 flex items-center justify-center bg-nord-0 p-2">
+      <div className="flex-1 min-h-0 min-w-0 relative bg-nord-0">
         {preview.tag === 'error' && !placeholderDataUrl ? (
-          <p className="text-nord-11 text-sm">Failed to load preview</p>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <p className="text-nord-11 text-sm">Failed to load preview</p>
+          </div>
         ) : displaySrc ? (
           <img
             src={displaySrc}
             alt={file.name}
-            className="max-w-full max-h-full object-contain"
+            className="absolute inset-0 w-full h-full object-contain"
             style={{ imageOrientation: 'from-image' }}
           />
         ) : (
-          <div className="w-24 h-24 rounded bg-nord-2 animate-pulse" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-24 h-24 rounded bg-nord-2 animate-pulse" />
+          </div>
         )}
       </div>
 

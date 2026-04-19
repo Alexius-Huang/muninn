@@ -186,20 +186,19 @@ export async function getPreview(pathDisplay: string, token: string): Promise<st
           size: 'w2048h1536',
           mode: 'strict',
         }),
-        'Content-Type': 'application/octet-stream',
       },
     });
   } catch (e) {
     throw new DropboxNetworkError((e as Error).message);
   }
   if (!resp.ok) throw await parseError(resp);
-  const buf = await resp.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return 'data:image/jpeg;base64,' + btoa(binary);
+  const blob = await resp.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to read image data'));
+    reader.readAsDataURL(blob);
+  });
 }
 
 export async function listFolderAll(path: string, token: string): Promise<DropboxEntry[]> {

@@ -17,6 +17,8 @@ type Active = { path: string; entries: DropboxEntry[] };
 
 const MIN_SIDEBAR = 140;
 const MAX_SIDEBAR = 600;
+const MIN_PREVIEW = 280;
+const MAX_PREVIEW = 900;
 
 function EmptyState() {
   return (
@@ -30,7 +32,9 @@ export function Connected({ account, token, onDisconnect }: Props) {
   const [active, setActive] = useState<Active | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [previewWidth, setPreviewWidth] = useState(480);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const cache = useThumbnailCache(token);
   const { flags, setFlag } = useCurationState(active?.path ?? null);
@@ -55,6 +59,27 @@ export function Connected({ account, token, onDisconnect }: Props) {
 
     function onUp() {
       dragRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
+  function handlePreviewResizeStart(e: React.MouseEvent) {
+    e.preventDefault();
+    previewDragRef.current = { startX: e.clientX, startWidth: previewWidth };
+
+    function onMove(ev: MouseEvent) {
+      if (!previewDragRef.current) return;
+      // dragging left increases panel width (panel is on the right)
+      const next = previewDragRef.current.startWidth - (ev.clientX - previewDragRef.current.startX);
+      setPreviewWidth(Math.max(MIN_PREVIEW, Math.min(MAX_PREVIEW, next)));
+    }
+
+    function onUp() {
+      previewDragRef.current = null;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     }
@@ -119,32 +144,41 @@ export function Connected({ account, token, onDisconnect }: Props) {
         />
 
         <section className="flex-1 min-w-0 flex overflow-hidden">
-          {active === null ? (
-            <EmptyState />
-          ) : (
-            <ThumbnailGrid
-              key={active.path}
-              path={active.path}
-              entries={active.entries}
-              cache={cache}
-              flags={flags}
-              onSelect={setSelectedIndex}
-            />
-          )}
+          <div className="flex-1 min-w-0 flex flex-col">
+            {active === null ? (
+              <EmptyState />
+            ) : (
+              <ThumbnailGrid
+                key={active.path}
+                path={active.path}
+                entries={active.entries}
+                cache={cache}
+                flags={flags}
+                onSelect={setSelectedIndex}
+              />
+            )}
+          </div>
 
           {selectedFile !== null && active !== null && (
-            <PreviewPanel
-              key={selectedFile.path_lower}
-              file={selectedFile}
-              index={selectedIndex!}
-              total={files.length}
-              flag={flags[selectedFile.path_lower]}
-              placeholderDataUrl={placeholderDataUrl}
-              token={token}
-              onClose={() => setSelectedIndex(null)}
-              onNavigate={handleNavigate}
-              onFlag={(value) => setFlag(selectedFile.path_lower, value)}
-            />
+            <>
+              <div
+                onMouseDown={handlePreviewResizeStart}
+                className="w-1 shrink-0 cursor-col-resize bg-nord-3 hover:bg-nord-8 transition-colors"
+              />
+              <PreviewPanel
+                key={selectedFile.path_lower}
+                file={selectedFile}
+                index={selectedIndex!}
+                total={files.length}
+                flag={flags[selectedFile.path_lower]}
+                placeholderDataUrl={placeholderDataUrl}
+                token={token}
+                width={previewWidth}
+                onClose={() => setSelectedIndex(null)}
+                onNavigate={handleNavigate}
+                onFlag={(value) => setFlag(selectedFile.path_lower, value)}
+              />
+            </>
           )}
         </section>
       </main>
