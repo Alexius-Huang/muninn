@@ -3,7 +3,7 @@ import type { DropboxAccount } from '../dropbox/client';
 import type { DropboxEntry } from '../dropbox/client';
 import { deleteDropboxToken } from '../auth/keychain';
 import { FolderPicker } from './FolderPicker';
-import { FileList } from './FileList';
+import { ThumbnailGrid } from './ThumbnailGrid';
 
 type Props = {
   account: DropboxAccount;
@@ -46,9 +46,10 @@ export function Connected({ account, token, onDisconnect }: Props) {
             onSelect={(path, entries) => setSelected({ path, entries })}
           />
         ) : (
-          <FileList
+          <ThumbnailGrid
             path={selected.path}
             entries={selected.entries}
+            token={token}
             onChange={() => setSelected(null)}
           />
         )}

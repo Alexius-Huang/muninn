@@ -5,6 +5,7 @@ import {
   listFolder,
   listFolderContinue,
   listFolderAll,
+  getThumbnailBatch,
   DropboxAuthError,
   DropboxNetworkError,
   DropboxApiError,
@@ -163,5 +164,59 @@ describe('listFolderAll', () => {
       .mockResolvedValueOnce(makeResponse(409, { error_summary: 'no_permission/...' }));
     vi.stubGlobal('fetch', fetchMock);
     await expect(listFolderAll('', 'tok')).rejects.toThrow(DropboxApiError);
+  });
+});
+
+describe('getThumbnailBatch', () => {
+  it('should POST to content.dropboxapi.com/2/files/get_thumbnail_batch with correct entry shape', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      makeResponse(200, { entries: [{ '.tag': 'success', metadata: { path_lower: '/photos/img.jpg' }, thumbnail: 'abc123' }] }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await getThumbnailBatch(['/Photos/img.jpg'], 'tok');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://content.dropboxapi.com/2/files/get_thumbnail_batch');
+    expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer tok');
+    const body = JSON.parse(init.body as string);
+    expect(body.entries).toHaveLength(1);
+    expect(body.entries[0]).toMatchObject({ path: '/Photos/img.jpg', format: 'jpeg', size: 'w256h256', mode: 'strict' });
+  });
+
+  it('should map success entries to { tag: "success", path_lower, dataUrl } with data:image/jpeg;base64, prefix', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      makeResponse(200, { entries: [{ '.tag': 'success', metadata: { path_lower: '/photos/img.jpg' }, thumbnail: 'base64data' }] }),
+    ));
+    const results = await getThumbnailBatch(['/Photos/img.jpg'], 'tok');
+    expect(results[0]).toEqual({ tag: 'success', path_lower: '/photos/img.jpg', dataUrl: 'data:image/jpeg;base64,base64data' });
+  });
+
+  it('should map failure entries to { tag: "failure", path_lower, reason } using request-order path', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      makeResponse(200, { entries: [{ '.tag': 'failure', failure: { '.tag': 'unsupported_extension' } }] }),
+    ));
+    const results = await getThumbnailBatch(['/Photos/RAW.cr2'], 'tok');
+    expect(results[0]).toEqual({ tag: 'failure', path_lower: '/photos/raw.cr2', reason: 'unsupported_extension' });
+  });
+
+  it('should throw DropboxAuthError on 401', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeResponse(401, 'Unauthorized')));
+    await expect(getThumbnailBatch(['/a.jpg'], 'tok')).rejects.toThrow(DropboxAuthError);
+  });
+
+  it('should throw DropboxApiError with error_summary on non-2xx non-401', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeResponse(409, { error_summary: 'too_many_files/...' })));
+    const err = await getThumbnailBatch(['/a.jpg'], 'tok').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DropboxApiError);
+    expect((err as DropboxApiError).message).toContain('too_many_files');
+  });
+
+  it('should throw DropboxNetworkError when fetch rejects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')));
+    await expect(getThumbnailBatch(['/a.jpg'], 'tok')).rejects.toThrow(DropboxNetworkError);
+  });
+
+  it('should throw synchronously when given more than 25 paths', async () => {
+    const paths = Array.from({ length: 26 }, (_, i) => `/img-${i}.jpg`);
+    await expect(getThumbnailBatch(paths, 'tok')).rejects.toThrow('max 25 paths per call');
   });
 });

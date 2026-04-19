@@ -12,7 +12,11 @@ vi.mock('../auth/keychain', () => ({
 
 vi.mock('../dropbox/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../dropbox/client')>();
-  return { ...actual, listFolderAll: vi.fn().mockResolvedValue([]) };
+  return {
+    ...actual,
+    listFolderAll: vi.fn().mockResolvedValue([]),
+    getThumbnailBatch: vi.fn().mockResolvedValue([]),
+  };
 });
 
 const FAKE_ACCOUNT = {
@@ -40,7 +44,7 @@ describe('Connected', () => {
     expect(screen.getByRole('button', { name: 'Dropbox' })).toBeInTheDocument();
   });
 
-  it('should switch to FileList after a folder is committed via the picker', async () => {
+  it('should switch to ThumbnailGrid after a folder is committed via the picker', async () => {
     const user = userEvent.setup();
     render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Select this folder' })).toBeInTheDocument());
@@ -48,7 +52,22 @@ describe('Connected', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Change folder' })).toBeInTheDocument());
   });
 
-  it('should return to the picker when "Change folder" is clicked from FileList', async () => {
+  it('should render ThumbnailGrid header after a folder is committed', async () => {
+    const { getThumbnailBatch: mockBatch } = await import('../dropbox/client');
+    vi.mocked(mockBatch).mockResolvedValue([]);
+    // mock listFolderAll to return one file so ThumbnailGrid shows "1 photos in"
+    const { listFolderAll: mockList } = await import('../dropbox/client');
+    vi.mocked(mockList).mockResolvedValue([
+      { '.tag': 'file', name: 'a.jpg', path_display: '/Lyon/a.jpg', path_lower: '/lyon/a.jpg', id: 'x', size: 1, server_modified: '' },
+    ]);
+    const user = userEvent.setup();
+    render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Select this folder' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Select this folder' }));
+    await waitFor(() => expect(screen.getByText(/1 photos in/)).toBeInTheDocument());
+  });
+
+  it('should return to the picker when "Change folder" is clicked from ThumbnailGrid', async () => {
     const user = userEvent.setup();
     render(<Connected account={FAKE_ACCOUNT} token="tok" onDisconnect={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Select this folder' })).toBeInTheDocument());

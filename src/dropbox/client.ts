@@ -125,6 +125,54 @@ export function listFolderContinue(cursor: string, token: string): Promise<ListF
   );
 }
 
+export type ThumbnailResult =
+  | { tag: 'success'; path_lower: string; dataUrl: string }
+  | { tag: 'failure'; path_lower: string; reason: string };
+
+type RawThumbnailEntry =
+  | { '.tag': 'success'; metadata: { path_lower: string }; thumbnail: string }
+  | { '.tag': 'failure'; failure: { '.tag': string } };
+
+export async function getThumbnailBatch(
+  paths: string[],
+  token: string,
+): Promise<ThumbnailResult[]> {
+  if (paths.length > 25) {
+    throw new Error('getThumbnailBatch: max 25 paths per call');
+  }
+  let resp: Response;
+  try {
+    resp = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail_batch', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        entries: paths.map((path) => ({ path, format: 'jpeg', size: 'w256h256', mode: 'strict' })),
+      }),
+    });
+  } catch (e) {
+    throw new DropboxNetworkError((e as Error).message);
+  }
+  if (!resp.ok) throw await parseError(resp);
+  const body = (await resp.json()) as { entries: RawThumbnailEntry[] };
+  return body.entries.map((entry, i) => {
+    if (entry['.tag'] === 'success') {
+      return {
+        tag: 'success' as const,
+        path_lower: entry.metadata.path_lower,
+        dataUrl: 'data:image/jpeg;base64,' + entry.thumbnail,
+      };
+    }
+    return {
+      tag: 'failure' as const,
+      path_lower: paths[i].toLowerCase(),
+      reason: entry.failure?.['.tag'] ?? 'unknown',
+    };
+  });
+}
+
 export async function listFolderAll(path: string, token: string): Promise<DropboxEntry[]> {
   const all: DropboxEntry[] = [];
   let result = await listFolder(path, token);
