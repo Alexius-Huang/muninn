@@ -53,8 +53,8 @@ function App() {
 
   if (state.status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-950">
-        <p className="text-neutral-500 text-sm">Loading…</p>
+      <div className="h-full flex items-center justify-center bg-nord-0">
+        <p className="text-nord-4 text-sm">Loading…</p>
       </div>
     );
   }

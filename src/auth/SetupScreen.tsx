@@ -39,14 +39,14 @@ export function SetupScreen({ onConnect }: Props) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-950">
-      <div className="w-full max-w-md px-8 py-10 bg-neutral-900 rounded-2xl shadow-xl">
-        <h1 className="text-2xl font-semibold text-white mb-2">Connect Dropbox</h1>
-        <p className="text-neutral-400 text-sm mb-8">
+    <div className="min-h-screen flex items-center justify-center bg-nord-0">
+      <div className="w-full max-w-md px-8 py-10 bg-nord-1 rounded-2xl shadow-xl">
+        <h1 className="text-2xl font-semibold text-nord-6 mb-2">Connect Dropbox</h1>
+        <p className="text-nord-4 text-sm mb-8">
           Paste your Dropbox access token to start curating photos. The token is stored in your macOS Keychain — never in browser storage.
         </p>
         <form onSubmit={handleSubmit}>
-          <label htmlFor="dropbox-token" className="block text-sm font-medium text-neutral-300 mb-2">
+          <label htmlFor="dropbox-token" className="block text-sm font-medium text-nord-5 mb-2">
             Access token
           </label>
           <input
@@ -55,20 +55,20 @@ export function SetupScreen({ onConnect }: Props) {
             value={token}
             onChange={(e) => setToken(e.target.value)}
             placeholder="sl.…"
-            className="w-full px-4 py-3 rounded-lg bg-neutral-800 text-white placeholder-neutral-500 border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+            className="w-full px-4 py-3 rounded-lg bg-nord-2 text-nord-6 placeholder-nord-3 border border-nord-3 focus:outline-none focus:ring-2 focus:ring-nord-8 mb-4"
             aria-invalid={status === 'error'}
             aria-describedby={status === 'error' ? 'token-error' : undefined}
             disabled={status === 'validating'}
           />
           {status === 'error' && (
-            <p id="token-error" role="alert" className="text-red-400 text-sm mb-4">
+            <p id="token-error" role="alert" className="text-nord-11 text-sm mb-4">
               {errorMessage}
             </p>
           )}
           <button
             type="submit"
             disabled={!token.trim() || status === 'validating'}
-            className="w-full py-3 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3 rounded-lg bg-nord-10 text-nord-6 font-medium hover:bg-nord-9 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {status === 'validating' ? 'Connecting…' : 'Connect'}
           </button>

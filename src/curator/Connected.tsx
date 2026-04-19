@@ -23,23 +23,23 @@ export function Connected({ account, token, onDisconnect }: Props) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-neutral-950">
-      <header className="flex items-center justify-between px-6 py-3 bg-neutral-900 border-b border-neutral-800">
+    <div className="h-full flex flex-col bg-nord-0">
+      <header className="flex items-center justify-between px-6 py-3 bg-nord-1 border-b border-nord-3">
         <div>
-          <span className="text-white font-medium text-sm">{account.name.display_name}</span>
+          <span className="text-nord-6 font-medium text-sm">{account.name.display_name}</span>
           {account.email && (
-            <span className="text-neutral-500 text-sm ml-2">{account.email}</span>
+            <span className="text-nord-4 text-sm ml-2">{account.email}</span>
           )}
         </div>
         <button
           onClick={handleDisconnect}
-          className="px-4 py-1.5 rounded-lg bg-neutral-700 text-neutral-200 hover:bg-neutral-600 transition-colors text-sm"
+          className="px-4 py-1.5 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
         >
           Disconnect
         </button>
       </header>
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 min-h-0 flex flex-col">
         {selected === null ? (
           <FolderPicker
             token={token}
