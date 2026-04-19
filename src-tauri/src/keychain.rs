@@ -1,30 +1,45 @@
-use keyring::Entry;
+use std::process::Command;
 
 const SERVICE: &str = "com.huang.muninn";
 const ACCOUNT: &str = "dropbox_access_token";
 
-fn entry() -> Result<Entry, String> {
-    Entry::new(SERVICE, ACCOUNT).map_err(|e| e.to_string())
-}
-
 #[tauri::command]
 pub fn get_dropbox_token() -> Result<Option<String>, String> {
-    match entry()?.get_password() {
-        Ok(token) => Ok(Some(token)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(e.to_string()),
+    let out = Command::new("security")
+        .args(["find-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if out.status.success() {
+        let token = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        Ok(Some(token))
+    } else {
+        Ok(None)
     }
 }
 
 #[tauri::command]
 pub fn set_dropbox_token(token: String) -> Result<(), String> {
-    entry()?.set_password(&token).map_err(|e| e.to_string())
+    // Delete any existing entry first (add fails if one exists).
+    let _ = Command::new("security")
+        .args(["delete-generic-password", "-s", SERVICE, "-a", ACCOUNT])
+        .output();
+
+    let out = Command::new("security")
+        .args(["add-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w", &token])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
 }
 
 #[tauri::command]
 pub fn delete_dropbox_token() -> Result<(), String> {
-    match entry()?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    let _ = Command::new("security")
+        .args(["delete-generic-password", "-s", SERVICE, "-a", ACCOUNT])
+        .output();
+    Ok(())
 }

@@ -18,7 +18,7 @@ function App() {
       let token: string | null;
       try {
         token = await getDropboxToken();
-      } catch {
+      } catch (e) {
         setState({ status: 'setup' });
         return;
       }
