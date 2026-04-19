@@ -76,12 +76,10 @@ export function ThumbnailGrid({ path, entries, token }: Props) {
   return (
     <CacheContext.Provider value={cache}>
       <div className="flex flex-col h-full">
-        <div className="shrink-0 px-6 pt-6 pb-4 bg-nord-0 border-b border-nord-3">
-          <div className="max-w-4xl mx-auto space-y-1">
-            <h2 className="text-nord-6 font-semibold text-lg">
-              {files.length} photos in {displayPath}
-            </h2>
-          </div>
+        <div className="shrink-0 px-6 pt-4 pb-3 bg-nord-0 border-b border-nord-3">
+          <h2 className="text-nord-6 font-semibold text-lg">
+            {files.length} photos in {displayPath}
+          </h2>
         </div>
 
         {files.length === 0 ? (

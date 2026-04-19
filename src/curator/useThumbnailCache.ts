@@ -6,6 +6,8 @@ export type ThumbnailState =
   | { tag: 'success'; dataUrl: string }
   | { tag: 'error' };
 
+const DEFAULT_LOADING: ThumbnailState = { tag: 'loading' };
+
 type Subscriber = () => void;
 
 export type ThumbnailCache = {
@@ -89,7 +91,7 @@ export function useThumbnailCache(token: string): ThumbnailCache {
 
   const peek = useCallback(
     (pathLower: string): ThumbnailState =>
-      cacheRef.current.get(pathLower) ?? { tag: 'loading' },
+      cacheRef.current.get(pathLower) ?? DEFAULT_LOADING,
     [],
   );
 
