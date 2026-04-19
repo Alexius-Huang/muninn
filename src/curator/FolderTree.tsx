@@ -139,10 +139,10 @@ function FolderTreeNode({ path, name, depth }: NodeProps) {
         </button>
         <button
           onClick={handleOpen}
-          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-nord-8 hover:text-nord-7 px-1 rounded"
+          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 text-xs text-nord-8 hover:text-nord-7 px-1 rounded"
           aria-label={`Open ${name}`}
         >
-          <ArrowRight size={13} />
+          Open <ArrowRight size={12} />
         </button>
       </div>
 
