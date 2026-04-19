@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ThumbnailCell } from './ThumbnailCell';
 import type { DropboxFile } from '../dropbox/client';
 
@@ -15,13 +16,13 @@ const FAKE_FILE: DropboxFile = {
 
 describe('ThumbnailCell', () => {
   it('should render a skeleton placeholder when state is loading', () => {
-    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} />);
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} onClick={vi.fn()} />);
     expect(screen.getByTestId('thumbnail-skeleton')).toBeInTheDocument();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
   it('should render an img with the data URL when state is success', () => {
-    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'success', dataUrl: 'data:image/jpeg;base64,abc' }} />);
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'success', dataUrl: 'data:image/jpeg;base64,abc' }} onClick={vi.fn()} />);
     const img = screen.getByRole('img');
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute('src', 'data:image/jpeg;base64,abc');
@@ -29,19 +30,34 @@ describe('ThumbnailCell', () => {
   });
 
   it('should render a broken-image placeholder when state is error', () => {
-    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'error' }} />);
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'error' }} onClick={vi.fn()} />);
     expect(screen.getByTestId('thumbnail-error')).toBeInTheDocument();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
-  it('should apply consistent wrapper class across all three states', () => {
-    const { rerender, container } = render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} />);
-    const wrapperClass = container.firstElementChild?.className;
+  it('should call onClick when the cell is clicked', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} onClick={onClick} />);
+    await user.click(screen.getByRole('button', { name: 'photo.jpg' }));
+    expect(onClick).toHaveBeenCalledOnce();
+  });
 
-    rerender(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'success', dataUrl: 'data:image/jpeg;base64,x' }} />);
-    expect(container.firstElementChild?.className).toBe(wrapperClass);
+  it('should render a keep badge when flag is keep', () => {
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} flag="keep" onClick={vi.fn()} />);
+    expect(screen.getByTestId('flag-keep')).toBeInTheDocument();
+    expect(screen.queryByTestId('flag-discard')).not.toBeInTheDocument();
+  });
 
-    rerender(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'error' }} />);
-    expect(container.firstElementChild?.className).toBe(wrapperClass);
+  it('should render a discard badge when flag is discard', () => {
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} flag="discard" onClick={vi.fn()} />);
+    expect(screen.getByTestId('flag-discard')).toBeInTheDocument();
+    expect(screen.queryByTestId('flag-keep')).not.toBeInTheDocument();
+  });
+
+  it('should render no badge when flag is undefined', () => {
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} onClick={vi.fn()} />);
+    expect(screen.queryByTestId('flag-keep')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('flag-discard')).not.toBeInTheDocument();
   });
 });

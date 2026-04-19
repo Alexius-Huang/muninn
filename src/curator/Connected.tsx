@@ -2,7 +2,10 @@ import { useRef, useState } from 'react';
 import type { DropboxAccount, DropboxEntry } from '../dropbox/client';
 import { deleteDropboxToken } from '../auth/keychain';
 import { FolderTree } from './FolderTree';
-import { ThumbnailGrid } from './ThumbnailGrid';
+import { ThumbnailGrid, sortFiles } from './ThumbnailGrid';
+import { PreviewPanel } from './PreviewPanel';
+import { useThumbnailCache } from './useThumbnailCache';
+import { useCurationState } from './useCurationState';
 
 type Props = {
   account: DropboxAccount;
@@ -25,8 +28,14 @@ function EmptyState() {
 
 export function Connected({ account, token, onDisconnect }: Props) {
   const [active, setActive] = useState<Active | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const cache = useThumbnailCache(token);
+  const { flags, setFlag } = useCurationState(active?.path ?? null);
+
+  const files = active ? sortFiles(active.entries) : [];
 
   async function handleDisconnect() {
     if (!window.confirm('Disconnect this Dropbox account? You will need to paste the token again to reconnect.')) return;
@@ -54,6 +63,26 @@ export function Connected({ account, token, onDisconnect }: Props) {
     window.addEventListener('mouseup', onUp);
   }
 
+  function handleOpen(path: string, entries: DropboxEntry[]) {
+    setActive({ path, entries });
+    setSelectedIndex(null);
+  }
+
+  function handleNavigate(delta: -1 | 1) {
+    if (selectedIndex === null) return;
+    const next = selectedIndex + delta;
+    if (next >= 0 && next < files.length) setSelectedIndex(next);
+  }
+
+  const selectedFile = selectedIndex !== null ? files[selectedIndex] : null;
+  const placeholderDataUrl =
+    selectedFile
+      ? (() => {
+          const s = cache.peek(selectedFile.path_lower);
+          return s.tag === 'success' ? s.dataUrl : undefined;
+        })()
+      : undefined;
+
   return (
     <div className="h-full flex flex-col bg-nord-0">
       <header className="flex items-center justify-between px-6 py-3 bg-nord-1 border-b border-nord-3 shrink-0">
@@ -79,7 +108,7 @@ export function Connected({ account, token, onDisconnect }: Props) {
           <FolderTree
             token={token}
             activePath={active?.path ?? null}
-            onOpen={(path, entries) => setActive({ path, entries })}
+            onOpen={handleOpen}
           />
         </aside>
 
@@ -89,14 +118,32 @@ export function Connected({ account, token, onDisconnect }: Props) {
           className="w-1 shrink-0 cursor-col-resize bg-nord-3 hover:bg-nord-8 transition-colors"
         />
 
-        <section className="flex-1 min-w-0 flex flex-col">
+        <section className="flex-1 min-w-0 flex overflow-hidden">
           {active === null ? (
             <EmptyState />
           ) : (
             <ThumbnailGrid
+              key={active.path}
               path={active.path}
               entries={active.entries}
+              cache={cache}
+              flags={flags}
+              onSelect={setSelectedIndex}
+            />
+          )}
+
+          {selectedFile !== null && active !== null && (
+            <PreviewPanel
+              key={selectedFile.path_lower}
+              file={selectedFile}
+              index={selectedIndex!}
+              total={files.length}
+              flag={flags[selectedFile.path_lower]}
+              placeholderDataUrl={placeholderDataUrl}
               token={token}
+              onClose={() => setSelectedIndex(null)}
+              onNavigate={handleNavigate}
+              onFlag={(value) => setFlag(selectedFile.path_lower, value)}
             />
           )}
         </section>

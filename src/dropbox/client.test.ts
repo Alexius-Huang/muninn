@@ -6,6 +6,7 @@ import {
   listFolderContinue,
   listFolderAll,
   getThumbnailBatch,
+  getPreview,
   DropboxAuthError,
   DropboxNetworkError,
   DropboxApiError,
@@ -218,5 +219,49 @@ describe('getThumbnailBatch', () => {
   it('should throw synchronously when given more than 25 paths', async () => {
     const paths = Array.from({ length: 26 }, (_, i) => `/img-${i}.jpg`);
     await expect(getThumbnailBatch(paths, 'tok')).rejects.toThrow('max 25 paths per call');
+  });
+});
+
+describe('getPreview', () => {
+  function makeBinaryResponse(status: number, bytes: Uint8Array): Response {
+    return {
+      status,
+      ok: status >= 200 && status < 300,
+      arrayBuffer: () => Promise.resolve(bytes.buffer as ArrayBuffer),
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(''),
+    } as unknown as Response;
+  }
+
+  it('should POST to files/get_thumbnail_v2 with the expected Dropbox-API-Arg header', async () => {
+    const bytes = new Uint8Array([0x00, 0x01]);
+    const fetchMock = vi.fn().mockResolvedValue(makeBinaryResponse(200, bytes));
+    vi.stubGlobal('fetch', fetchMock);
+    await getPreview('/Photos/img.jpg', 'tok');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://content.dropboxapi.com/2/files/get_thumbnail_v2');
+    const arg = JSON.parse((init.headers as Record<string, string>)['Dropbox-API-Arg']);
+    expect(arg.resource).toEqual({ '.tag': 'path', path: '/Photos/img.jpg' });
+    expect(arg.size).toBe('w2048h1536');
+    expect(arg.mode).toBe('strict');
+  });
+
+  it('should return a data:image/jpeg;base64,… URL on success', async () => {
+    const bytes = new Uint8Array([0xff, 0xd8]);
+    const fetchMock = vi.fn().mockResolvedValue(makeBinaryResponse(200, bytes));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await getPreview('/Photos/img.jpg', 'tok');
+    expect(result).toMatch(/^data:image\/jpeg;base64,/);
+  });
+
+  it('should throw DropboxAuthError on 401', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeResponse(401, 'Unauthorized'));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getPreview('/Photos/img.jpg', 'tok')).rejects.toThrow(DropboxAuthError);
+  });
+
+  it('should throw DropboxNetworkError when fetch rejects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')));
+    await expect(getPreview('/Photos/img.jpg', 'tok')).rejects.toThrow(DropboxNetworkError);
   });
 });

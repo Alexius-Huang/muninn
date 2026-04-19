@@ -1,11 +1,12 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, useSyncExternalStore, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { DropboxEntry, DropboxFile } from '../dropbox/client';
-import { useThumbnailCache, type ThumbnailCache } from './useThumbnailCache';
+import type { ThumbnailCache } from './useThumbnailCache';
 import { ThumbnailCell } from './ThumbnailCell';
+import type { CurationFlags } from './curation';
 
 const CELL_SIZE = 160;
-const LABEL_HEIGHT = 20; // text-xs (16px) + gap-1 (4px)
+const LABEL_HEIGHT = 20;
 const GAP = 8;
 
 const CacheContext = createContext<ThumbnailCache | null>(null);
@@ -16,7 +17,15 @@ function useCacheContext(): ThumbnailCache {
   return ctx;
 }
 
-function ConnectedCell({ file }: { file: DropboxFile }) {
+function ConnectedCell({
+  file,
+  flag,
+  onSelect,
+}: {
+  file: DropboxFile;
+  flag: CurationFlags[string] | undefined;
+  onSelect: () => void;
+}) {
   const cache = useCacheContext();
 
   const state = useSyncExternalStore(
@@ -28,22 +37,26 @@ function ConnectedCell({ file }: { file: DropboxFile }) {
     cache.request(file.path_display);
   }, [file.path_display, cache]);
 
-  return <ThumbnailCell file={file} state={state} />;
+  return <ThumbnailCell file={file} state={state} flag={flag} onClick={onSelect} />;
 }
 
 type Props = {
   path: string;
   entries: DropboxEntry[];
-  token: string;
+  cache: ThumbnailCache;
+  flags: CurationFlags;
+  onSelect: (index: number) => void;
 };
 
-export function ThumbnailGrid({ path, entries, token }: Props) {
-  const files: DropboxFile[] = (entries as DropboxEntry[])
+export function sortFiles(entries: DropboxEntry[]): DropboxFile[] {
+  return (entries as DropboxEntry[])
     .filter((e): e is DropboxFile => e['.tag'] === 'file')
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+}
 
+export function ThumbnailGrid({ path, entries, cache, flags, onSelect }: Props) {
+  const files = sortFiles(entries);
   const displayPath = path === '' ? '/' : path;
-  const cache = useThumbnailCache(token);
 
   const parentRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(4);
@@ -111,8 +124,13 @@ export function ThumbnailGrid({ path, entries, token }: Props) {
                       gap: GAP,
                     }}
                   >
-                    {rowFiles.map((file) => (
-                      <ConnectedCell key={file.path_lower} file={file} />
+                    {rowFiles.map((file, colIdx) => (
+                      <ConnectedCell
+                        key={file.path_lower}
+                        file={file}
+                        flag={flags[file.path_lower]}
+                        onSelect={() => onSelect(startIndex + colIdx)}
+                      />
                     ))}
                   </div>
                 );

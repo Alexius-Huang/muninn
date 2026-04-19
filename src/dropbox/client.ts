@@ -173,6 +173,35 @@ export async function getThumbnailBatch(
   });
 }
 
+export async function getPreview(pathDisplay: string, token: string): Promise<string> {
+  let resp: Response;
+  try {
+    resp = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail_v2', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Dropbox-API-Arg': JSON.stringify({
+          resource: { '.tag': 'path', path: pathDisplay },
+          format: 'jpeg',
+          size: 'w2048h1536',
+          mode: 'strict',
+        }),
+        'Content-Type': 'application/octet-stream',
+      },
+    });
+  } catch (e) {
+    throw new DropboxNetworkError((e as Error).message);
+  }
+  if (!resp.ok) throw await parseError(resp);
+  const buf = await resp.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return 'data:image/jpeg;base64,' + btoa(binary);
+}
+
 export async function listFolderAll(path: string, token: string): Promise<DropboxEntry[]> {
   const all: DropboxEntry[] = [];
   let result = await listFolder(path, token);
