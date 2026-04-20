@@ -53,21 +53,14 @@ export function FlaggedGrid({ records, cache, onSelect }: Props) {
   useLayoutEffect(() => {
     const el = parentRef.current;
     if (!el) return;
-    let timerId: ReturnType<typeof setTimeout> | null = null;
     const compute = () => {
       const w = el.clientWidth;
       if (w > 0) setColumns(Math.max(2, Math.floor((w - 32) / (CELL_SIZE + GAP))));
     };
     compute();
-    const ro = new ResizeObserver(() => {
-      if (timerId !== null) clearTimeout(timerId);
-      timerId = setTimeout(compute, 50);
-    });
+    const ro = new ResizeObserver(compute);
     ro.observe(el);
-    return () => {
-      ro.disconnect();
-      if (timerId !== null) clearTimeout(timerId);
-    };
+    return () => ro.disconnect();
   }, []);
 
   const rowCount = Math.ceil(records.length / columns);
