@@ -16,6 +16,7 @@ type Props = {
   flag: Flag | undefined;
   placeholderDataUrl: string | undefined;
   width: number;
+  isResizing?: boolean;
   onClose: () => void;
   onNavigate: (delta: -1 | 1) => void;
   onFlag: (value: Flag | undefined) => void;
@@ -28,6 +29,7 @@ export function PreviewPanel({
   flag,
   placeholderDataUrl,
   width,
+  isResizing = false,
   onClose,
   onNavigate,
   onFlag,
@@ -85,7 +87,10 @@ export function PreviewPanel({
     preview.tag === 'success' ? preview.dataUrl : (placeholderDataUrl ?? undefined);
 
   return (
-    <aside className="flex flex-col shrink-0 bg-nord-1" style={{ width }}>
+    <aside
+      className="flex flex-col shrink-0 bg-nord-1"
+      style={{ width, transition: isResizing ? undefined : 'width 200ms ease' }}
+    >
 
       {/* header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-nord-3 shrink-0">

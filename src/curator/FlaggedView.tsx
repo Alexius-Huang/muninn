@@ -11,11 +11,12 @@ type Props = {
   isActive: boolean;
   cache: ThumbnailCache;
   previewWidth: number;
+  isResizing?: boolean;
   onPreviewResize: (e: React.MouseEvent) => void;
   onBeforeActivate: () => void;
 };
 
-export function FlaggedView({ isActive, cache, previewWidth, onPreviewResize, onBeforeActivate }: Props) {
+export function FlaggedView({ isActive, cache, previewWidth, isResizing = false, onPreviewResize, onBeforeActivate }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
@@ -132,6 +133,7 @@ export function FlaggedView({ isActive, cache, previewWidth, onPreviewResize, on
               flag={selectedFlat!.record.flag}
               placeholderDataUrl={placeholderDataUrl}
               width={previewWidth}
+              isResizing={isResizing}
               onClose={() => setSelectedIndex(null)}
               onNavigate={handleNavigate}
               onFlag={handleFlag}

@@ -64,16 +64,22 @@ export function ThumbnailGrid({ path, entries, cache, flags, onSelect }: Props) 
   useLayoutEffect(() => {
     const el = parentRef.current;
     if (!el) return;
-    const updateColumns = () => {
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+    const compute = () => {
       const w = el.clientWidth;
-      if (w > 0) {
-        setColumns(Math.max(2, Math.floor((w - 32) / (CELL_SIZE + GAP))));
-      }
+      if (w > 0) setColumns(Math.max(2, Math.floor((w - 32) / (CELL_SIZE + GAP))));
     };
-    updateColumns();
-    const ro = new ResizeObserver(updateColumns);
+    // Immediate on mount — no debounce so first paint is correct
+    compute();
+    const ro = new ResizeObserver(() => {
+      if (timerId !== null) clearTimeout(timerId);
+      timerId = setTimeout(compute, 50);
+    });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      if (timerId !== null) clearTimeout(timerId);
+    };
   }, []);
 
   const rowCount = Math.ceil(files.length / columns);
