@@ -51,7 +51,7 @@ export function ThumbnailCell({ file, state, flag, onClick }: Props) {
           </div>
         )}
       </div>
-      <p className="text-nord-4 text-xs truncate text-center leading-4">{file.name}</p>
+      <p className="w-full text-nord-4 text-xs truncate text-center leading-4" title={file.name}>{file.name}</p>
     </button>
   );
 }

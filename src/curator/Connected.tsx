@@ -32,6 +32,7 @@ export function Connected({ account, onDisconnect }: Props) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [previewWidth, setPreviewWidth] = useState(480);
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
@@ -41,7 +42,11 @@ export function Connected({ account, onDisconnect }: Props) {
   const files = active ? sortFiles(active.entries) : [];
 
   async function handleDisconnect() {
-    if (!window.confirm('Disconnect this Dropbox account?')) return;
+    if (!confirmingDisconnect) {
+      setConfirmingDisconnect(true);
+      return;
+    }
+    setConfirmingDisconnect(false);
     await disconnect();
     onDisconnect();
   }
@@ -115,12 +120,30 @@ export function Connected({ account, onDisconnect }: Props) {
             <span className="text-nord-4 text-sm ml-2">{account.email}</span>
           )}
         </div>
-        <button
-          onClick={handleDisconnect}
-          className="px-4 py-1.5 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
-        >
-          Disconnect
-        </button>
+        {confirmingDisconnect ? (
+          <div className="flex items-center gap-2">
+            <span className="text-nord-4 text-sm">Disconnect?</span>
+            <button
+              onClick={handleDisconnect}
+              className="px-3 py-1 rounded-lg bg-nord-11 text-white hover:bg-red-600 transition-colors text-sm"
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => setConfirmingDisconnect(false)}
+              className="px-3 py-1 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleDisconnect}
+            className="px-4 py-1.5 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
+          >
+            Disconnect
+          </button>
+        )}
       </header>
 
       <main className="flex-1 min-h-0 flex overflow-hidden">
