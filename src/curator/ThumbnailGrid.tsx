@@ -112,7 +112,7 @@ export function ThumbnailGrid({ path, entries, cache, flags, onSelect }: Props) 
                 height: virtualizer.getTotalSize() + 16,
                 position: 'relative',
                 width: gridWidth,
-                margin: '0 auto',
+                marginLeft: 16,
               }}
             >
               {virtualizer.getVirtualItems().map((virtualRow) => {
