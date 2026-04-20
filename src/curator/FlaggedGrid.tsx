@@ -80,7 +80,7 @@ export function FlaggedGrid({ records, cache, onSelect }: Props) {
           height: virtualizer.getTotalSize() + 16,
           position: 'relative',
           width: gridWidth,
-          marginLeft: 16,
+          marginLeft: 32,
         }}
       >
         {virtualizer.getVirtualItems().map((vRow) => {
