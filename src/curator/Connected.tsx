@@ -39,7 +39,7 @@ export function Connected({ account, onDisconnect }: Props) {
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const cache = useThumbnailCache();
-  const { flags, setFlag } = useCurationState(active?.path ?? null);
+  const { flags, setFlag, flush: flushBrowse } = useCurationState(active?.path ?? null);
 
   const files = active ? sortFiles(active.entries) : [];
 
@@ -198,7 +198,7 @@ export function Connected({ account, onDisconnect }: Props) {
               )}
             </div>
 
-            {selectedFile !== null && active !== null && (
+            {selectedFile !== null && active !== null && tab === 'browse' && (
               <>
                 <div
                   onMouseDown={handlePreviewResizeStart}
@@ -214,7 +214,7 @@ export function Connected({ account, onDisconnect }: Props) {
                   width={previewWidth}
                   onClose={() => setSelectedIndex(null)}
                   onNavigate={handleNavigate}
-                  onFlag={(value) => setFlag(selectedFile.path_lower, value)}
+                  onFlag={(value) => setFlag(selectedFile, value)}
                 />
               </>
             )}
@@ -222,7 +222,13 @@ export function Connected({ account, onDisconnect }: Props) {
         </div>
 
         <div className={`flex-1 min-h-0 flex overflow-hidden ${tab !== 'flagged' ? 'hidden' : ''}`}>
-          <FlaggedView />
+          <FlaggedView
+            isActive={tab === 'flagged'}
+            cache={cache}
+            previewWidth={previewWidth}
+            onPreviewResize={handlePreviewResizeStart}
+            onBeforeActivate={flushBrowse}
+          />
         </div>
       </main>
     </div>

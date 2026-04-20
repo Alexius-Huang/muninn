@@ -15,6 +15,13 @@ vi.mock('./auth/dropboxAuth', () => ({
   onDisconnect: (...args: unknown[]) => mockOnDisconnect(...args),
 }));
 
+vi.mock('./curator/curation', () => ({
+  listCuration: vi.fn().mockResolvedValue([]),
+  readCuration: vi.fn().mockResolvedValue(null),
+  writeCuration: vi.fn().mockResolvedValue(undefined),
+  migrateLegacyCurationFile: vi.fn((x: unknown) => x),
+}));
+
 vi.mock('./dropbox/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./dropbox/client')>();
   return {

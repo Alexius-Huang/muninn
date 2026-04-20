@@ -6,6 +6,9 @@ import { Connected } from './Connected';
 
 const mockDisconnect = vi.fn();
 const mockSetFlag = vi.fn();
+const mockFlushBrowse = vi.fn();
+const mockListCuration = vi.fn();
+const mockWriteCuration = vi.fn();
 
 vi.mock('../auth/dropboxAuth', () => ({
   disconnect: (...args: unknown[]) => mockDisconnect(...args),
@@ -22,7 +25,12 @@ vi.mock('../dropbox/client', async (importOriginal) => {
 });
 
 vi.mock('./useCurationState', () => ({
-  useCurationState: vi.fn(() => ({ flags: {}, setFlag: mockSetFlag })),
+  useCurationState: vi.fn(() => ({ flags: {}, setFlag: mockSetFlag, flush: mockFlushBrowse })),
+}));
+
+vi.mock('./curation', () => ({
+  listCuration: (...args: unknown[]) => mockListCuration(...args),
+  writeCuration: (...args: unknown[]) => mockWriteCuration(...args),
 }));
 
 beforeAll(() => {
@@ -58,6 +66,11 @@ beforeEach(() => {
   mockDisconnect.mockReset();
   mockDisconnect.mockResolvedValue(undefined);
   mockSetFlag.mockReset();
+  mockFlushBrowse.mockReset();
+  mockListCuration.mockReset();
+  mockWriteCuration.mockReset();
+  mockListCuration.mockResolvedValue([]);
+  mockWriteCuration.mockResolvedValue(undefined);
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
@@ -184,11 +197,12 @@ describe('Connected > top tab bar', () => {
     expect(screen.getByRole('button', { name: 'Flagged' })).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('should show the flagged placeholder when the Flagged tab is clicked', async () => {
+  it('should show the flagged empty state when the Flagged tab is clicked', async () => {
     const user = userEvent.setup();
+    mockListCuration.mockResolvedValue([]);
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await user.click(screen.getByRole('button', { name: 'Flagged' }));
-    expect(screen.getByText('No flagged photos yet')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('No flagged photos yet')).toBeInTheDocument());
     expect(document.querySelector('aside')?.parentElement).toHaveClass('hidden');
   });
 
@@ -222,5 +236,51 @@ describe('Connected > top tab bar', () => {
     await user.click(screen.getByRole('button', { name: 'Flagged' }));
     await user.click(screen.getByRole('button', { name: 'Browse' }));
     expect(screen.getByText(/0 photos in \/Lyon/)).toBeInTheDocument();
+  });
+
+  it('should call flush on Browse state when switching to Flagged', async () => {
+    const user = userEvent.setup();
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'Flagged' }));
+    expect(mockFlushBrowse).toHaveBeenCalled();
+  });
+
+  it('should show a flagged photo in Flagged tab after it was flagged in Browse', async () => {
+    const user = userEvent.setup();
+    mockListCuration.mockResolvedValue([
+      {
+        folderPath: '/Photos/Lyon',
+        records: {
+          '/photos/lyon/a.jpg': {
+            pathLower: '/photos/lyon/a.jpg',
+            pathDisplay: '/Photos/Lyon/a.jpg',
+            name: 'a.jpg',
+            flag: 'keep',
+          },
+        },
+      },
+    ]);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'Flagged' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'a.jpg' })).toBeInTheDocument());
+  });
+
+  it('should not render the Browse PreviewPanel when on the Flagged tab', async () => {
+    const user = userEvent.setup();
+    const { listFolderAll } = await import('../dropbox/client');
+    vi.mocked(listFolderAll)
+      .mockResolvedValueOnce([
+        { '.tag': 'folder', name: 'Lyon', path_display: '/Lyon', path_lower: '/lyon' },
+      ])
+      .mockResolvedValue([makeFile('photo.jpg', '/Lyon/photo.jpg')]);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Lyon' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Open Lyon' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'photo.jpg' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'photo.jpg' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /close preview/i })).toBeInTheDocument());
+    // Switch to Flagged — Browse PreviewPanel should be gone
+    await user.click(screen.getByRole('button', { name: 'Flagged' }));
+    expect(screen.queryByRole('button', { name: /close preview/i })).not.toBeInTheDocument();
   });
 });
