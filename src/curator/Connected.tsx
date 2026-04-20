@@ -4,6 +4,7 @@ import { disconnect } from '../auth/dropboxAuth';
 import { FolderTree } from './FolderTree';
 import { ThumbnailGrid, sortFiles } from './ThumbnailGrid';
 import { PreviewPanel } from './PreviewPanel';
+import { FlaggedView } from './FlaggedView';
 import { useThumbnailCache } from './useThumbnailCache';
 import { useCurationState } from './useCurationState';
 
@@ -28,6 +29,7 @@ function EmptyState() {
 }
 
 export function Connected({ account, onDisconnect }: Props) {
+  const [tab, setTab] = useState<'browse' | 'flagged'>('browse');
   const [active, setActive] = useState<Active | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(240);
@@ -120,6 +122,22 @@ export function Connected({ account, onDisconnect }: Props) {
             <span className="text-nord-4 text-sm ml-2">{account.email}</span>
           )}
         </div>
+        <div className="flex gap-1">
+          <button
+            aria-pressed={tab === 'browse'}
+            onClick={() => setTab('browse')}
+            className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${tab === 'browse' ? 'bg-nord-2 text-nord-6' : 'text-nord-4 hover:bg-nord-1'}`}
+          >
+            Browse
+          </button>
+          <button
+            aria-pressed={tab === 'flagged'}
+            onClick={() => setTab('flagged')}
+            className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${tab === 'flagged' ? 'bg-nord-2 text-nord-6' : 'text-nord-4 hover:bg-nord-1'}`}
+          >
+            Flagged
+          </button>
+        </div>
         {confirmingDisconnect ? (
           <div className="flex items-center gap-2">
             <span className="text-nord-4 text-sm">Disconnect?</span>
@@ -147,59 +165,65 @@ export function Connected({ account, onDisconnect }: Props) {
       </header>
 
       <main className="flex-1 min-h-0 flex overflow-hidden">
-        <aside
-          style={{ width: sidebarWidth }}
-          className="shrink-0 overflow-y-auto bg-nord-0"
-        >
-          <FolderTree
-            activePath={active?.path ?? null}
-            onOpen={handleOpen}
+        <div className={`flex-1 min-h-0 flex overflow-hidden ${tab !== 'browse' ? 'hidden' : ''}`}>
+          <aside
+            style={{ width: sidebarWidth }}
+            className="shrink-0 overflow-y-auto bg-nord-0"
+          >
+            <FolderTree
+              activePath={active?.path ?? null}
+              onOpen={handleOpen}
+            />
+          </aside>
+
+          {/* drag handle */}
+          <div
+            onMouseDown={handleResizeStart}
+            className="w-1 shrink-0 cursor-col-resize bg-nord-3 hover:bg-nord-8 transition-colors"
           />
-        </aside>
 
-        {/* drag handle */}
-        <div
-          onMouseDown={handleResizeStart}
-          className="w-1 shrink-0 cursor-col-resize bg-nord-3 hover:bg-nord-8 transition-colors"
-        />
+          <section className="flex-1 min-w-0 flex overflow-hidden">
+            <div className="flex-1 min-w-0 flex flex-col">
+              {active === null ? (
+                <EmptyState />
+              ) : (
+                <ThumbnailGrid
+                  key={active.path}
+                  path={active.path}
+                  entries={active.entries}
+                  cache={cache}
+                  flags={flags}
+                  onSelect={setSelectedIndex}
+                />
+              )}
+            </div>
 
-        <section className="flex-1 min-w-0 flex overflow-hidden">
-          <div className="flex-1 min-w-0 flex flex-col">
-            {active === null ? (
-              <EmptyState />
-            ) : (
-              <ThumbnailGrid
-                key={active.path}
-                path={active.path}
-                entries={active.entries}
-                cache={cache}
-                flags={flags}
-                onSelect={setSelectedIndex}
-              />
+            {selectedFile !== null && active !== null && (
+              <>
+                <div
+                  onMouseDown={handlePreviewResizeStart}
+                  className="w-1 shrink-0 cursor-col-resize bg-nord-3 hover:bg-nord-8 transition-colors"
+                />
+                <PreviewPanel
+                  key={selectedFile.path_lower}
+                  file={selectedFile}
+                  index={selectedIndex!}
+                  total={files.length}
+                  flag={flags[selectedFile.path_lower]}
+                  placeholderDataUrl={placeholderDataUrl}
+                  width={previewWidth}
+                  onClose={() => setSelectedIndex(null)}
+                  onNavigate={handleNavigate}
+                  onFlag={(value) => setFlag(selectedFile.path_lower, value)}
+                />
+              </>
             )}
-          </div>
+          </section>
+        </div>
 
-          {selectedFile !== null && active !== null && (
-            <>
-              <div
-                onMouseDown={handlePreviewResizeStart}
-                className="w-1 shrink-0 cursor-col-resize bg-nord-3 hover:bg-nord-8 transition-colors"
-              />
-              <PreviewPanel
-                key={selectedFile.path_lower}
-                file={selectedFile}
-                index={selectedIndex!}
-                total={files.length}
-                flag={flags[selectedFile.path_lower]}
-                placeholderDataUrl={placeholderDataUrl}
-                width={previewWidth}
-                onClose={() => setSelectedIndex(null)}
-                onNavigate={handleNavigate}
-                onFlag={(value) => setFlag(selectedFile.path_lower, value)}
-              />
-            </>
-          )}
-        </section>
+        <div className={`flex-1 min-h-0 flex overflow-hidden ${tab !== 'flagged' ? 'hidden' : ''}`}>
+          <FlaggedView />
+        </div>
       </main>
     </div>
   );
