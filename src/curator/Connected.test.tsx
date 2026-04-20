@@ -154,18 +154,73 @@ describe('Connected', () => {
     const user = userEvent.setup();
     const onDisconnect = vi.fn();
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={onDisconnect} />);
-    await user.click(screen.getByRole('button', { name: /disconnect/i }));
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+    await user.click(screen.getByRole('button', { name: 'Yes' }));
     expect(mockDisconnect).toHaveBeenCalledOnce();
     expect(onDisconnect).toHaveBeenCalledOnce();
   });
 
-  it('should not disconnect when the user cancels the confirm dialog', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('should not disconnect when the user clicks Cancel in the confirm UI', async () => {
     const user = userEvent.setup();
     const onDisconnect = vi.fn();
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={onDisconnect} />);
-    await user.click(screen.getByRole('button', { name: /disconnect/i }));
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(mockDisconnect).not.toHaveBeenCalled();
     expect(onDisconnect).not.toHaveBeenCalled();
+  });
+});
+
+describe('Connected > top tab bar', () => {
+  it('should render Browse and Flagged tabs in the header', () => {
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Browse' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Flagged' })).toBeInTheDocument();
+  });
+
+  it('should default to the Browse tab on mount', () => {
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Browse' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Flagged' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('should show the flagged placeholder when the Flagged tab is clicked', async () => {
+    const user = userEvent.setup();
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'Flagged' }));
+    expect(screen.getByText('No flagged photos yet')).toBeInTheDocument();
+    expect(document.querySelector('aside')?.parentElement).toHaveClass('hidden');
+  });
+
+  it('should restore the browse view when the Browse tab is clicked after switching to Flagged', async () => {
+    const user = userEvent.setup();
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'Flagged' }));
+    await user.click(screen.getByRole('button', { name: 'Browse' }));
+    expect(document.querySelector('aside')?.parentElement).not.toHaveClass('hidden');
+  });
+
+  it('should mark the Flagged tab active (aria-pressed=true) after it is clicked', async () => {
+    const user = userEvent.setup();
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'Flagged' }));
+    expect(screen.getByRole('button', { name: 'Flagged' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Browse' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('should preserve the active folder when toggling tabs', async () => {
+    const user = userEvent.setup();
+    const { listFolderAll } = await import('../dropbox/client');
+    vi.mocked(listFolderAll).mockResolvedValue([
+      { '.tag': 'folder', name: 'Lyon', path_display: '/Lyon', path_lower: '/lyon' },
+    ]);
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Lyon' })).toBeInTheDocument());
+    vi.mocked(listFolderAll).mockResolvedValue([]);
+    await user.click(screen.getByRole('button', { name: 'Open Lyon' }));
+    await waitFor(() => expect(screen.getByText(/0 photos in \/Lyon/)).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Flagged' }));
+    await user.click(screen.getByRole('button', { name: 'Browse' }));
+    expect(screen.getByText(/0 photos in \/Lyon/)).toBeInTheDocument();
   });
 });
