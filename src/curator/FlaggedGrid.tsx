@@ -34,7 +34,7 @@ function GridCell({ flat, cache, onSelect }: CellProps) {
     path_lower: record.pathLower,
     id: record.pathLower,
     size: 0,
-    server_modified: '',
+    server_modified: '', // TODO: superseded by MUN-15 (capturedAt)
   };
 
   return <ThumbnailCell file={file} state={state} flag={record.flag} onClick={onSelect} />;

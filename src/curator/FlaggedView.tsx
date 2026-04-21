@@ -24,16 +24,14 @@ export function FlaggedView({ isActive, cache, previewWidth, isResizing = false,
 
   // On isActive false→true: flush Browse writes first, then reload
   const prevActiveRef = useRef(isActive);
-  const onBeforeActivateRef = useRef(onBeforeActivate);
-  onBeforeActivateRef.current = onBeforeActivate;
 
   useEffect(() => {
     if (isActive && !prevActiveRef.current) {
-      onBeforeActivateRef.current();
+      onBeforeActivate();
       void reload();
     }
     prevActiveRef.current = isActive;
-  }, [isActive, reload]);
+  }, [isActive, reload, onBeforeActivate]);
 
   // Flush our own pending writes when we become inactive
   useEffect(() => {
@@ -74,7 +72,7 @@ export function FlaggedView({ isActive, cache, previewWidth, isResizing = false,
         path_lower: selectedFlat.record.pathLower,
         id: selectedFlat.record.pathLower,
         size: 0,
-        server_modified: '',
+        server_modified: '', // TODO: superseded by MUN-15 (capturedAt)
       }
     : null;
 

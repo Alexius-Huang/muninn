@@ -47,12 +47,10 @@ pub async fn write_curation(
     Ok(())
 }
 
-#[tauri::command]
-pub async fn list_curation(app: AppHandle) -> Result<Vec<String>, String> {
-    let dir = curation_dir(&app)?;
-    match fs::read_dir(&dir) {
-        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(vec![]),
-        Err(e) => return Err(e.to_string()),
+fn scan_curation_dir(dir: &std::path::Path) -> Result<Vec<String>, String> {
+    match fs::read_dir(dir) {
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok(vec![]),
+        Err(e) => Err(e.to_string()),
         Ok(entries) => {
             let mut results = Vec::new();
             for entry in entries {
@@ -74,6 +72,12 @@ pub async fn list_curation(app: AppHandle) -> Result<Vec<String>, String> {
     }
 }
 
+#[tauri::command]
+pub async fn list_curation(app: AppHandle) -> Result<Vec<String>, String> {
+    let dir = curation_dir(&app)?;
+    scan_curation_dir(&dir)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,13 +91,7 @@ mod tests {
     fn list_curation_missing_dir_returns_empty() {
         let tmp = std::env::temp_dir().join(format!("muninn_test_{}", std::process::id()));
         let dir = tmp.join("curation");
-        // dir does not exist — simulate missing curation dir
-        let result: Vec<String> = {
-            match std::fs::read_dir(&dir) {
-                Err(e) if e.kind() == ErrorKind::NotFound => vec![],
-                _ => panic!("expected NotFound"),
-            }
-        };
+        let result = scan_curation_dir(&dir).unwrap();
         assert!(result.is_empty());
     }
 
@@ -104,15 +102,7 @@ mod tests {
         write_file(&dir, "abc.json", r#"{"folderPath":"/a","records":{}}"#);
         write_file(&dir, "def.json.tmp", r#"partial"#);
 
-        let mut results = Vec::new();
-        for entry in std::fs::read_dir(&dir).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-            if name.ends_with(".json") && !name.ends_with(".json.tmp") {
-                results.push(std::fs::read_to_string(&path).unwrap());
-            }
-        }
+        let results = scan_curation_dir(&dir).unwrap();
         assert_eq!(results.len(), 1);
         assert!(results[0].contains("/a"));
         std::fs::remove_dir_all(&tmp).ok();
@@ -125,15 +115,7 @@ mod tests {
         write_file(&dir, "aaa.json", r#"{"folderPath":"/folder1","records":{}}"#);
         write_file(&dir, "bbb.json", r#"{"folderPath":"/folder2","records":{}}"#);
 
-        let mut results = Vec::new();
-        for entry in std::fs::read_dir(&dir).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-            if name.ends_with(".json") && !name.ends_with(".json.tmp") {
-                results.push(std::fs::read_to_string(&path).unwrap());
-            }
-        }
+        let results = scan_curation_dir(&dir).unwrap();
         assert_eq!(results.len(), 2);
         std::fs::remove_dir_all(&tmp).ok();
     }

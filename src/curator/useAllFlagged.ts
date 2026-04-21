@@ -50,11 +50,18 @@ export function useAllFlagged(): AllFlaggedReturn {
     setLoading(true);
     try {
       const files = await listCuration();
-      // Only overlay folders with pending unsaved writes; fresh folders get disk data
+      const diskPaths = new Set(files.map((f) => f.folderPath));
+      // Overlay pending in-memory writes on top of disk data
       for (const file of files) {
         if (timersRef.current.has(file.folderPath)) {
           const inMemory = filesRef.current.get(file.folderPath);
           if (inMemory !== undefined) file.records = inMemory;
+        }
+      }
+      // Preserve in-memory-only folders not yet flushed to disk
+      for (const [folderPath, recs] of filesRef.current) {
+        if (!diskPaths.has(folderPath) && timersRef.current.has(folderPath)) {
+          files.push({ folderPath, records: recs });
         }
       }
       filesRef.current = new Map(files.map((f) => [f.folderPath, f.records]));

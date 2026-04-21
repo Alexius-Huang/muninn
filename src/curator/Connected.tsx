@@ -225,6 +225,7 @@ export function Connected({ account, onDisconnect }: Props) {
           </section>
         </div>
 
+        {/* Keep FlaggedView mounted (not conditionally rendered) so useAllFlagged stays alive for the isActive edge trigger */}
         <div className={`flex-1 min-h-0 flex overflow-hidden ${tab !== 'flagged' ? 'hidden' : ''}`}>
           <FlaggedView
             isActive={tab === 'flagged'}
