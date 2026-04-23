@@ -3,12 +3,13 @@ import { listCuration, writeCuration, type CurationFile, type CurationRecord, ty
 
 export type FlatRecord = {
   folderPath: string;
+  key: string;
   record: CurationRecord;
 };
 
 export type AllFlaggedReturn = {
   records: FlatRecord[];
-  setFlag: (folderPath: string, pathLower: string, value: Flag | undefined) => void;
+  setFlag: (folderPath: string, recordKey: string, value: Flag | undefined) => void;
   reload: () => Promise<void>;
   flush: () => Promise<void>;
   loading: boolean;
@@ -18,11 +19,11 @@ function flatten(files: CurationFile[]): FlatRecord[] {
   const result: FlatRecord[] = [];
   const sorted = [...files].sort((a, b) => a.folderPath.localeCompare(b.folderPath));
   for (const file of sorted) {
-    const recs = Object.values(file.records)
-      .filter((r) => r.flag !== undefined)
-      .sort((a, b) => a.name.localeCompare(b.name));
-    for (const record of recs) {
-      result.push({ folderPath: file.folderPath, record });
+    const recs = Object.entries(file.records)
+      .filter(([, r]) => r.flag !== undefined)
+      .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+    for (const [key, record] of recs) {
+      result.push({ folderPath: file.folderPath, key, record });
     }
   }
   return result;
@@ -73,17 +74,18 @@ export function useAllFlagged(): AllFlaggedReturn {
     }
   }, []);
 
-  const setFlag = useCallback((folderPath: string, pathLower: string, value: Flag | undefined) => {
+  const setFlag = useCallback((folderPath: string, recordKey: string, value: Flag | undefined) => {
     const current = filesRef.current.get(folderPath) ?? {};
     const next = { ...current };
     if (value === undefined) {
-      delete next[pathLower];
+      delete next[recordKey];
     } else {
-      const existing = next[pathLower];
-      next[pathLower] = {
-        pathLower,
-        pathDisplay: existing?.pathDisplay ?? pathLower,
-        name: existing?.name ?? (pathLower.split('/').filter(Boolean).pop() ?? pathLower),
+      const existing = next[recordKey];
+      next[recordKey] = {
+        ...existing,
+        pathLower: existing?.pathLower ?? recordKey,
+        pathDisplay: existing?.pathDisplay ?? recordKey,
+        name: existing?.name ?? (recordKey.split('/').filter(Boolean).pop() ?? recordKey),
         flag: value,
       };
     }

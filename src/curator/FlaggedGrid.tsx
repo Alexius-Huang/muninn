@@ -26,15 +26,15 @@ function GridCell({ flat, cache, onSelect }: CellProps) {
     cache.request(record.pathDisplay);
   }, [record.pathDisplay, cache]);
 
-  // Synthesise a minimal DropboxFile shape for ThumbnailCell
   const file = {
     '.tag': 'file' as const,
     name: record.name,
     path_display: record.pathDisplay,
     path_lower: record.pathLower,
-    id: record.pathLower,
+    id: record.photoId ?? record.pathLower,
     size: 0,
-    server_modified: '', // TODO: superseded by MUN-15 (capturedAt)
+    server_modified: '',
+    client_modified: '',
   };
 
   return <ThumbnailCell file={file} state={state} flag={record.flag} onClick={onSelect} />;

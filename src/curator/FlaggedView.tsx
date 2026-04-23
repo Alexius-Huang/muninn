@@ -52,7 +52,7 @@ export function FlaggedView({ isActive, cache, previewWidth, isResizing = false,
 
   function handleFlag(value: Flag | undefined) {
     if (!selectedFlat) return;
-    setFlag(selectedFlat.folderPath, selectedFlat.record.pathLower, value);
+    setFlag(selectedFlat.folderPath, selectedFlat.key, value);
     // If the record would leave the filtered view (unflag or wrong flag for current filter), close preview
     if (value === undefined || (filter !== 'all' && value !== filter)) {
       setSelectedIndex(null);
@@ -72,9 +72,10 @@ export function FlaggedView({ isActive, cache, previewWidth, isResizing = false,
         name: selectedFlat.record.name,
         path_display: selectedFlat.record.pathDisplay,
         path_lower: selectedFlat.record.pathLower,
-        id: selectedFlat.record.pathLower,
+        id: selectedFlat.record.photoId ?? selectedFlat.record.pathLower,
         size: 0,
-        server_modified: '', // TODO: superseded by MUN-15 (capturedAt)
+        server_modified: '',
+        client_modified: '',
       }
     : null;
 

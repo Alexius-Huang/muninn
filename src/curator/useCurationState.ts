@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { readCuration, writeCuration, type CurationFile, type CurationRecord, type Flag } from './curation';
+import { readCuration, writeCuration, migrateToIdKeys, type CurationFile, type CurationRecord, type Flag } from './curation';
 import type { DropboxFile } from '../dropbox/client';
 
 export type CurationStateReturn = {
@@ -8,12 +8,17 @@ export type CurationStateReturn = {
   flush: () => Promise<void>;
 };
 
-export function useCurationState(folderPath: string | null): CurationStateReturn {
+export function useCurationState(folderPath: string | null, files: DropboxFile[]): CurationStateReturn {
   const [records, setRecords] = useState<CurationFile['records']>({});
   const recordsRef = useRef<CurationFile['records']>({});
   const dirtyRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const folderPathRef = useRef(folderPath);
+  const filesRef = useRef<DropboxFile[]>(files);
+
+  useEffect(() => {
+    filesRef.current = files;
+  });
 
   const flush = useCallback((): Promise<void> => {
     if (timerRef.current !== null) {
@@ -36,7 +41,17 @@ export function useCurationState(folderPath: string | null): CurationStateReturn
     let cancelled = false;
     readCuration(folderPath).then((file) => {
       if (cancelled) return;
-      const loaded = file?.records ?? {};
+      let loaded = file?.records ?? {};
+      if (filesRef.current.length > 0 && file) {
+        const result = migrateToIdKeys({ folderPath, records: loaded }, filesRef.current);
+        if (result.changed) {
+          loaded = result.file.records;
+          if (result.droppedCount > 0) {
+            console.warn(`[muninn] migrateToIdKeys: dropped ${result.droppedCount} orphan record(s) for ${folderPath}`);
+          }
+          void writeCuration({ folderPath, records: loaded });
+        }
+      }
       recordsRef.current = loaded;
       setRecords(loaded);
     });
@@ -54,13 +69,15 @@ export function useCurationState(folderPath: string | null): CurationStateReturn
   const setFlag = useCallback((file: DropboxFile, value: Flag | undefined) => {
     const next = { ...recordsRef.current };
     if (value === undefined) {
-      delete next[file.path_lower];
+      delete next[file.id];
     } else {
-      next[file.path_lower] = {
+      next[file.id] = {
+        photoId: file.id,
         pathLower: file.path_lower,
         pathDisplay: file.path_display,
         name: file.name,
         flag: value,
+        capturedAt: file.media_info?.metadata?.time_taken ?? file.client_modified,
       } satisfies CurationRecord;
     }
     recordsRef.current = next;

@@ -87,9 +87,10 @@ const FAKE_FILE = {
   name: 'img.jpg',
   path_display: '/Photos/img.jpg',
   path_lower: '/photos/img.jpg',
-  id: 'abc',
+  id: 'id:abc',
   size: 1024,
   server_modified: '2026-01-01T00:00:00Z',
+  client_modified: '2025-12-31T12:00:00Z',
 };
 
 function makeListResponse(entries: unknown[], has_more = false, cursor = 'cursor-1'): Response {
@@ -104,6 +105,14 @@ describe('listFolder', () => {
     expect(url).toBe('https://api.dropboxapi.com/2/files/list_folder');
     const body = JSON.parse(init.body as string);
     expect(body).toMatchObject({ path: '/Photos', recursive: false, limit: 2000 });
+  });
+
+  it('should set include_media_info true on the list_folder body', async () => {
+    mockAuthFetch.mockResolvedValue(makeListResponse([FAKE_FOLDER]));
+    await listFolder('/Photos');
+    const [, init] = mockAuthFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.include_media_info).toBe(true);
   });
 
   it('should return entries, cursor, has_more on 2xx', async () => {

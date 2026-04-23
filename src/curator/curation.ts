@@ -1,13 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { DropboxFile } from '../dropbox/client';
 
 export type Flag = 'keep' | 'discard';
 export type CurationFlags = Record<string, Flag>;
 
 export type CurationRecord = {
+  photoId?: string;
   pathLower: string;
   pathDisplay: string;
   name: string;
   flag: Flag;
+  capturedAt?: string;
 };
 
 export type CurationFile = {
@@ -49,6 +52,39 @@ export function migrateLegacyCurationFile(raw: unknown): CurationFile {
   }
 
   throw new Error('Invalid curation file: missing records or flags');
+}
+
+export function migrateToIdKeys(
+  file: CurationFile,
+  dropboxFiles: DropboxFile[],
+): { file: CurationFile; changed: boolean; droppedCount: number } {
+  const keys = Object.keys(file.records);
+  if (keys.length === 0 || keys.every((k) => k.startsWith('id:'))) {
+    return { file, changed: false, droppedCount: 0 };
+  }
+
+  const byPathLower = new Map(dropboxFiles.map((f) => [f.path_lower, f]));
+  const newRecords: Record<string, CurationRecord> = {};
+  let droppedCount = 0;
+
+  for (const [key, record] of Object.entries(file.records)) {
+    if (key.startsWith('id:')) {
+      newRecords[key] = record;
+      continue;
+    }
+    const dbFile = byPathLower.get(record.pathLower);
+    if (!dbFile) {
+      droppedCount++;
+      continue;
+    }
+    newRecords[dbFile.id] = {
+      ...record,
+      photoId: dbFile.id,
+      capturedAt: record.capturedAt ?? dbFile.media_info?.metadata?.time_taken ?? dbFile.client_modified,
+    };
+  }
+
+  return { file: { ...file, records: newRecords }, changed: true, droppedCount };
 }
 
 export async function readCuration(folderPath: string): Promise<CurationFile | null> {

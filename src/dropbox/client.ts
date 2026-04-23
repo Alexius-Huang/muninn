@@ -21,6 +21,10 @@ export type DropboxFile = {
   id: string;
   size: number;
   server_modified: string;
+  client_modified: string;
+  media_info?: {
+    metadata?: { time_taken?: string };
+  };
 };
 
 export type DropboxEntry = DropboxFolder | DropboxFile;
@@ -109,7 +113,7 @@ export function listFolder(path: string): Promise<ListFolderResult> {
   return callDropbox('https://api.dropboxapi.com/2/files/list_folder', {
     path,
     recursive: false,
-    include_media_info: false,
+    include_media_info: true,
     limit: 2000,
   });
 }
