@@ -15,6 +15,7 @@ pub fn run() {
       oauth_callback::wait_for_oauth_callback,
       curation::read_curation,
       curation::write_curation,
+      curation::list_curation,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

@@ -6,7 +6,15 @@ Muninn is a personal photo curator built as a **native macOS app** using Tauri v
 
 ## Status
 
-active — as of 2026-04-19. Vite + React + Tailwind scaffold complete. Tauri scaffold complete (MUN-6). Dropbox token setup UI + macOS Keychain round-trip complete (MUN-2). Folder picker + file listing complete (MUN-3). Virtualized thumbnail grid complete (MUN-4). Feature work pending — see MUN-5 onward.
+active — as of 2026-04-21. Core curation loop is fully working end-to-end:
+
+- Dropbox OAuth2 PKCE auth, token stored in macOS Keychain (MUN-2)
+- Folder tree picker + file listing (MUN-3)
+- Virtualized thumbnail grid with keep/discard flagging (MUN-4)
+- Browse tab: click a thumbnail → preview panel with K/D/arrow key controls; flags persist to per-folder curation JSON on disk
+- Flagged tab: aggregates all flagged photos across every visited folder; filterable by All / Keep / Discard; same preview panel + keyboard controls (MUN-14)
+
+Next: grouping / categorisation epic (MUN-20+), map view epic (MUN-17+).
 
 ## Stack
 

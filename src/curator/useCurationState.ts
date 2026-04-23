@@ -1,41 +1,44 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { readCuration, writeCuration, type CurationFlags, type Flag } from './curation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { readCuration, writeCuration, type CurationFile, type CurationRecord, type Flag } from './curation';
+import type { DropboxFile } from '../dropbox/client';
 
-export function useCurationState(folderPath: string | null): {
-  flags: CurationFlags;
-  setFlag: (pathLower: string, value: Flag | undefined) => void;
-} {
-  const [flags, setFlags] = useState<CurationFlags>({});
-  const flagsRef = useRef<CurationFlags>({});
+export type CurationStateReturn = {
+  flags: Record<string, Flag>;
+  setFlag: (file: DropboxFile, value: Flag | undefined) => void;
+  flush: () => Promise<void>;
+};
+
+export function useCurationState(folderPath: string | null): CurationStateReturn {
+  const [records, setRecords] = useState<CurationFile['records']>({});
+  const recordsRef = useRef<CurationFile['records']>({});
   const dirtyRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const folderPathRef = useRef(folderPath);
 
-  const flush = useCallback(() => {
+  const flush = useCallback((): Promise<void> => {
     if (timerRef.current !== null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (!dirtyRef.current || !folderPathRef.current) return;
+    if (!dirtyRef.current || !folderPathRef.current) return Promise.resolve();
     dirtyRef.current = false;
-    writeCuration({ folderPath: folderPathRef.current, flags: flagsRef.current });
+    return writeCuration({ folderPath: folderPathRef.current, records: recordsRef.current });
   }, []);
 
   useEffect(() => {
-    // flush pending write from previous folder before switching
     flush();
     folderPathRef.current = folderPath;
-    flagsRef.current = {};
-    setFlags({});
+    recordsRef.current = {};
+    setRecords({});
     dirtyRef.current = false;
 
     if (!folderPath) return;
     let cancelled = false;
     readCuration(folderPath).then((file) => {
       if (cancelled) return;
-      const loaded = file?.flags ?? {};
-      flagsRef.current = loaded;
-      setFlags(loaded);
+      const loaded = file?.records ?? {};
+      recordsRef.current = loaded;
+      setRecords(loaded);
     });
     return () => {
       cancelled = true;
@@ -48,15 +51,20 @@ export function useCurationState(folderPath: string | null): {
     };
   }, [flush]);
 
-  const setFlag = useCallback((pathLower: string, value: Flag | undefined) => {
-    const next = { ...flagsRef.current };
+  const setFlag = useCallback((file: DropboxFile, value: Flag | undefined) => {
+    const next = { ...recordsRef.current };
     if (value === undefined) {
-      delete next[pathLower];
+      delete next[file.path_lower];
     } else {
-      next[pathLower] = value;
+      next[file.path_lower] = {
+        pathLower: file.path_lower,
+        pathDisplay: file.path_display,
+        name: file.name,
+        flag: value,
+      } satisfies CurationRecord;
     }
-    flagsRef.current = next;
-    setFlags({ ...flagsRef.current });
+    recordsRef.current = next;
+    setRecords({ ...recordsRef.current });
     dirtyRef.current = true;
 
     if (timerRef.current !== null) clearTimeout(timerRef.current);
@@ -64,10 +72,18 @@ export function useCurationState(folderPath: string | null): {
       timerRef.current = null;
       dirtyRef.current = false;
       if (folderPathRef.current) {
-        writeCuration({ folderPath: folderPathRef.current, flags: flagsRef.current });
+        writeCuration({ folderPath: folderPathRef.current, records: recordsRef.current });
       }
     }, 250);
   }, []);
 
-  return { flags, setFlag };
+  const flags = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(records).map(([k, r]) => [k, r.flag]),
+      ) as Record<string, Flag>,
+    [records],
+  );
+
+  return { flags, setFlag, flush };
 }

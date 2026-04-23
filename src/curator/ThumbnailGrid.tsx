@@ -64,14 +64,12 @@ export function ThumbnailGrid({ path, entries, cache, flags, onSelect }: Props) 
   useLayoutEffect(() => {
     const el = parentRef.current;
     if (!el) return;
-    const updateColumns = () => {
+    const compute = () => {
       const w = el.clientWidth;
-      if (w > 0) {
-        setColumns(Math.max(2, Math.floor((w - 32) / (CELL_SIZE + GAP))));
-      }
+      if (w > 0) setColumns(Math.max(2, Math.floor((w - 32) / (CELL_SIZE + GAP))));
     };
-    updateColumns();
-    const ro = new ResizeObserver(updateColumns);
+    compute();
+    const ro = new ResizeObserver(compute);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -106,7 +104,7 @@ export function ThumbnailGrid({ path, entries, cache, flags, onSelect }: Props) 
                 height: virtualizer.getTotalSize() + 16,
                 position: 'relative',
                 width: gridWidth,
-                margin: '0 auto',
+                marginLeft: 32,
               }}
             >
               {virtualizer.getVirtualItems().map((virtualRow) => {

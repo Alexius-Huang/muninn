@@ -34,12 +34,13 @@ export function Connected({ account, onDisconnect }: Props) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [previewWidth, setPreviewWidth] = useState(480);
+  const [isDraggingPreview, setIsDraggingPreview] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const cache = useThumbnailCache();
-  const { flags, setFlag } = useCurationState(active?.path ?? null);
+  const { flags, setFlag, flush: flushBrowse } = useCurationState(active?.path ?? null);
 
   const files = active ? sortFiles(active.entries) : [];
 
@@ -75,6 +76,7 @@ export function Connected({ account, onDisconnect }: Props) {
 
   function handlePreviewResizeStart(e: React.MouseEvent) {
     e.preventDefault();
+    setIsDraggingPreview(true);
     previewDragRef.current = { startX: e.clientX, startWidth: previewWidth };
 
     function onMove(ev: MouseEvent) {
@@ -85,6 +87,7 @@ export function Connected({ account, onDisconnect }: Props) {
 
     function onUp() {
       previewDragRef.current = null;
+      setIsDraggingPreview(false);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     }
@@ -198,7 +201,7 @@ export function Connected({ account, onDisconnect }: Props) {
               )}
             </div>
 
-            {selectedFile !== null && active !== null && (
+            {selectedFile !== null && active !== null && tab === 'browse' && (
               <>
                 <div
                   onMouseDown={handlePreviewResizeStart}
@@ -212,17 +215,26 @@ export function Connected({ account, onDisconnect }: Props) {
                   flag={flags[selectedFile.path_lower]}
                   placeholderDataUrl={placeholderDataUrl}
                   width={previewWidth}
+                  isResizing={isDraggingPreview}
                   onClose={() => setSelectedIndex(null)}
                   onNavigate={handleNavigate}
-                  onFlag={(value) => setFlag(selectedFile.path_lower, value)}
+                  onFlag={(value) => setFlag(selectedFile, value)}
                 />
               </>
             )}
           </section>
         </div>
 
+        {/* Keep FlaggedView mounted (not conditionally rendered) so useAllFlagged stays alive for the isActive edge trigger */}
         <div className={`flex-1 min-h-0 flex overflow-hidden ${tab !== 'flagged' ? 'hidden' : ''}`}>
-          <FlaggedView />
+          <FlaggedView
+            isActive={tab === 'flagged'}
+            cache={cache}
+            previewWidth={previewWidth}
+            isResizing={isDraggingPreview}
+            onPreviewResize={handlePreviewResizeStart}
+            onBeforeActivate={flushBrowse}
+          />
         </div>
       </main>
     </div>
