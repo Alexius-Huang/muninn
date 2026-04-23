@@ -10,7 +10,7 @@ export type AllFlaggedReturn = {
   records: FlatRecord[];
   setFlag: (folderPath: string, pathLower: string, value: Flag | undefined) => void;
   reload: () => Promise<void>;
-  flush: () => void;
+  flush: () => Promise<void>;
   loading: boolean;
 };
 
@@ -35,15 +35,17 @@ export function useAllFlagged(): AllFlaggedReturn {
   const filesRef = useRef<Map<string, CurationFile['records']>>(new Map());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const flush = useCallback(() => {
+  const flush = useCallback((): Promise<void> => {
+    const writes: Promise<void>[] = [];
     for (const [folderPath, timer] of timersRef.current) {
       clearTimeout(timer);
       const recs = filesRef.current.get(folderPath);
       if (recs !== undefined) {
-        writeCuration({ folderPath, records: recs });
+        writes.push(writeCuration({ folderPath, records: recs }));
       }
     }
     timersRef.current.clear();
+    return Promise.all(writes).then(() => undefined);
   }, []);
 
   const reload = useCallback(async () => {

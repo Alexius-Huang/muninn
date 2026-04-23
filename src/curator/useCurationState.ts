@@ -5,7 +5,7 @@ import type { DropboxFile } from '../dropbox/client';
 export type CurationStateReturn = {
   flags: Record<string, Flag>;
   setFlag: (file: DropboxFile, value: Flag | undefined) => void;
-  flush: () => void;
+  flush: () => Promise<void>;
 };
 
 export function useCurationState(folderPath: string | null): CurationStateReturn {
@@ -15,14 +15,14 @@ export function useCurationState(folderPath: string | null): CurationStateReturn
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const folderPathRef = useRef(folderPath);
 
-  const flush = useCallback(() => {
+  const flush = useCallback((): Promise<void> => {
     if (timerRef.current !== null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (!dirtyRef.current || !folderPathRef.current) return;
+    if (!dirtyRef.current || !folderPathRef.current) return Promise.resolve();
     dirtyRef.current = false;
-    writeCuration({ folderPath: folderPathRef.current, records: recordsRef.current });
+    return writeCuration({ folderPath: folderPathRef.current, records: recordsRef.current });
   }, []);
 
   useEffect(() => {

@@ -13,7 +13,7 @@ type Props = {
   previewWidth: number;
   isResizing?: boolean;
   onPreviewResize: (e: React.MouseEvent) => void;
-  onBeforeActivate: () => void;
+  onBeforeActivate: () => Promise<void>;
 };
 
 export function FlaggedView({ isActive, cache, previewWidth, isResizing = false, onPreviewResize, onBeforeActivate }: Props) {
@@ -27,8 +27,10 @@ export function FlaggedView({ isActive, cache, previewWidth, isResizing = false,
 
   useEffect(() => {
     if (isActive && !prevActiveRef.current) {
-      onBeforeActivate();
-      void reload();
+      void (async () => {
+        await onBeforeActivate();
+        await reload();
+      })();
     }
     prevActiveRef.current = isActive;
   }, [isActive, reload, onBeforeActivate]);
