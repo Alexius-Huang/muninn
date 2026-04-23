@@ -170,4 +170,24 @@ describe('FlaggedView', () => {
     await waitFor(() => expect(mockListCuration).toHaveBeenCalledTimes(2));
     expect(onBeforeActivate).toHaveBeenCalledOnce();
   });
+
+  it('should not call reload until onBeforeActivate resolves', async () => {
+    let resolveBefore!: () => void;
+    const onBeforeActivate = vi.fn(
+      () => new Promise<void>((r) => { resolveBefore = r; }),
+    );
+    mockListCuration.mockResolvedValue([]);
+    const { rerender } = render(
+      <FlaggedView {...DEFAULT_PROPS} isActive={false} onBeforeActivate={onBeforeActivate} />,
+    );
+    await waitFor(() => expect(mockListCuration).toHaveBeenCalledTimes(1));
+
+    rerender(<FlaggedView {...DEFAULT_PROPS} isActive={true} onBeforeActivate={onBeforeActivate} />);
+    // onBeforeActivate is pending — reload must not have fired yet
+    await Promise.resolve();
+    expect(mockListCuration).toHaveBeenCalledTimes(1);
+
+    resolveBefore();
+    await waitFor(() => expect(mockListCuration).toHaveBeenCalledTimes(2));
+  });
 });
