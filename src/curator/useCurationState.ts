@@ -71,13 +71,14 @@ export function useCurationState(folderPath: string | null, files: DropboxFile[]
     if (value === undefined) {
       delete next[file.id];
     } else {
+      const existing = recordsRef.current[file.id];
       next[file.id] = {
         photoId: file.id,
         pathLower: file.path_lower,
         pathDisplay: file.path_display,
         name: file.name,
         flag: value,
-        capturedAt: file.media_info?.metadata?.time_taken ?? file.client_modified,
+        capturedAt: existing?.capturedAt ?? file.media_info?.metadata?.time_taken ?? file.client_modified,
       } satisfies CurationRecord;
     }
     recordsRef.current = next;

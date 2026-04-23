@@ -120,6 +120,21 @@ describe('useCurationState', () => {
     expect(mockWriteCuration.mock.calls[0][0].records['id:a.jpg'].capturedAt).toBe('2026-03-15T10:00:00Z');
   });
 
+  it('should preserve capturedAt when setFlag is called again on a record that already has one', async () => {
+    mockReadCuration.mockResolvedValue({
+      folderPath: '/Photos/Lyon',
+      records: {
+        'id:a.jpg': { photoId: 'id:a.jpg', pathLower: '/photos/lyon/a.jpg', pathDisplay: '/Photos/Lyon/a.jpg', name: 'a.jpg', flag: 'keep', capturedAt: '2024-01-01T00:00:00Z' },
+      },
+    });
+    const file = makeFile('a.jpg', '/Photos/Lyon/a.jpg', '2026-03-15T10:00:00Z');
+    const { result } = renderHook(() => useCurationState('/Photos/Lyon', []));
+    await act(async () => {});
+    act(() => { result.current.setFlag(file, 'discard'); });
+    await act(async () => { vi.advanceTimersByTime(250); });
+    expect(mockWriteCuration.mock.calls[0][0].records['id:a.jpg'].capturedAt).toBe('2024-01-01T00:00:00Z');
+  });
+
   it('should remove the flag when setFlag is called with undefined', async () => {
     mockReadCuration.mockResolvedValue({
       folderPath: '/Photos/Lyon',

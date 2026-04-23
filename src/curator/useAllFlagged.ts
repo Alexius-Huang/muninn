@@ -81,13 +81,8 @@ export function useAllFlagged(): AllFlaggedReturn {
       delete next[recordKey];
     } else {
       const existing = next[recordKey];
-      next[recordKey] = {
-        ...existing,
-        pathLower: existing?.pathLower ?? recordKey,
-        pathDisplay: existing?.pathDisplay ?? recordKey,
-        name: existing?.name ?? (recordKey.split('/').filter(Boolean).pop() ?? recordKey),
-        flag: value,
-      };
+      if (!existing) return;
+      next[recordKey] = { ...existing, flag: value };
     }
     filesRef.current.set(folderPath, next);
 
