@@ -126,7 +126,7 @@ export function ThumbnailGrid({ path, entries, cache, flags, onSelect }: Props) 
                       <ConnectedCell
                         key={file.path_lower}
                         file={file}
-                        flag={flags[file.path_lower]}
+                        flag={flags[file.id]}
                         onSelect={() => onSelect(startIndex + colIdx)}
                       />
                     ))}

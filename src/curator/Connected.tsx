@@ -40,9 +40,8 @@ export function Connected({ account, onDisconnect }: Props) {
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const cache = useThumbnailCache();
-  const { flags, setFlag, flush: flushBrowse } = useCurationState(active?.path ?? null);
-
   const files = active ? sortFiles(active.entries) : [];
+  const { flags, setFlag, flush: flushBrowse } = useCurationState(active?.path ?? null, files);
 
   async function handleDisconnect() {
     if (!confirmingDisconnect) {
@@ -212,7 +211,7 @@ export function Connected({ account, onDisconnect }: Props) {
                   file={selectedFile}
                   index={selectedIndex!}
                   total={files.length}
-                  flag={flags[selectedFile.path_lower]}
+                  flag={flags[selectedFile.id]}
                   placeholderDataUrl={placeholderDataUrl}
                   width={previewWidth}
                   isResizing={isDraggingPreview}

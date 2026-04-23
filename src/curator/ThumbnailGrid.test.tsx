@@ -38,9 +38,10 @@ function makeFile(name: string, path: string): DropboxEntry {
     name,
     path_display: path,
     path_lower: path.toLowerCase(),
-    id: `id-${name}`,
+    id: `id:${name}`,
     size: 1024,
     server_modified: '2026-01-01T00:00:00Z',
+    client_modified: '2025-12-31T12:00:00Z',
   };
 }
 
@@ -112,7 +113,7 @@ describe('ThumbnailGrid', () => {
 
   it('should render badges matching the flags prop', async () => {
     const entries = [makeFile('a.jpg', '/Lyon/a.jpg'), makeFile('b.jpg', '/Lyon/b.jpg')];
-    const flags = { '/lyon/a.jpg': 'keep' as const };
+    const flags = { 'id:a.jpg': 'keep' as const };
     await act(async () => {
       render(
         <ThumbnailGrid
