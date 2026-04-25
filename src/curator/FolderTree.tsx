@@ -94,11 +94,31 @@ function FolderTreeNode({ path, name, depth }: NodeProps) {
     .filter((e): e is DropboxFolder => e['.tag'] === 'folder')
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 
-  function handleToggle() {
-    if (nodeState.entries === null && !nodeState.loading) {
-      fetchNode(path, dispatch);
+  const isLeaf = nodeState.entries !== null && childFolders.length === 0;
+
+  async function handleRowClick() {
+    if (nodeState.loading) return;
+    if (nodeState.entries !== null) {
+      if (childFolders.length === 0) {
+        onOpen(path, nodeState.entries);
+      } else {
+        dispatch({ type: 'TOGGLE', path });
+      }
+      return;
     }
-    dispatch({ type: 'TOGGLE', path });
+    dispatch({ type: 'REQUEST', path });
+    try {
+      const entries = await listFolderAll(path);
+      dispatch({ type: 'SUCCESS', path, entries });
+      const folders = entries.filter((e): e is DropboxFolder => e['.tag'] === 'folder');
+      if (folders.length === 0) {
+        onOpen(path, entries);
+      } else {
+        dispatch({ type: 'TOGGLE', path });
+      }
+    } catch (e) {
+      dispatch({ type: 'ERROR', path, error: (e as Error).message });
+    }
   }
 
   async function handleOpen() {
@@ -125,9 +145,9 @@ function FolderTreeNode({ path, name, depth }: NodeProps) {
         style={{ paddingLeft: depth * 12 + 4, paddingRight: 4, paddingTop: 6, paddingBottom: 6 }}
       >
         <button
-          onClick={handleToggle}
+          onClick={handleRowClick}
           className="flex items-center gap-2 flex-1 min-w-0 text-left"
-          aria-label={`${nodeState.expanded ? 'Collapse' : 'Expand'} ${name}`}
+          aria-label={isLeaf ? `Open ${name}` : `${nodeState.expanded ? 'Collapse' : 'Expand'} ${name}`}
         >
           <span className={`shrink-0 ${nodeState.loading ? 'opacity-40' : ''} text-nord-4`}>
             {nodeState.expanded
