@@ -1,3 +1,4 @@
+import { Loader2, AlertTriangle } from 'lucide-react';
 import type { DropboxFile } from '../dropbox/client';
 import type { ThumbnailState } from './useThumbnailCache';
 import type { Flag } from './curation';
@@ -29,10 +30,12 @@ export function ThumbnailCell({ file, state, flag, onClick }: Props) {
       >
         {state.tag === 'loading' && (
           <div
-            data-testid="thumbnail-skeleton"
+            data-testid="thumbnail-loading"
             role="presentation"
-            className="w-full h-full bg-nord-2 animate-pulse"
-          />
+            className="flex items-center justify-center w-full h-full"
+          >
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
         )}
         {state.tag === 'success' && (
           <img
@@ -45,9 +48,9 @@ export function ThumbnailCell({ file, state, flag, onClick }: Props) {
           <div
             data-testid="thumbnail-error"
             title={file.name}
-            className="w-full h-full flex items-center justify-center text-nord-3 text-xl"
+            className="w-full h-full flex items-center justify-center"
           >
-            ⚠
+            <AlertTriangle className="h-5 w-5 text-red-500" />
           </div>
         )}
       </div>

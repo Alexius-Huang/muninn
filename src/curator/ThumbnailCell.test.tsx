@@ -15,9 +15,9 @@ const FAKE_FILE: DropboxFile = {
 };
 
 describe('ThumbnailCell', () => {
-  it('should render a skeleton placeholder when state is loading', () => {
+  it('should render a loading spinner when state is loading', () => {
     render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} onClick={vi.fn()} />);
-    expect(screen.getByTestId('thumbnail-skeleton')).toBeInTheDocument();
+    expect(screen.getByTestId('thumbnail-loading')).toBeInTheDocument();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
