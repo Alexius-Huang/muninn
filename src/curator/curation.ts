@@ -123,19 +123,12 @@ export function applyFlag(
       delete next[file.id];
     }
   } else {
-    const { groupId: _g, ...rest } = existing ?? {
-      photoId: file.id,
-      pathLower: file.path_lower,
-      pathDisplay: file.path_display,
-      name: file.name,
-      capturedAt: file.media_info?.metadata?.time_taken ?? file.client_modified,
-    };
     next[file.id] = {
       photoId: file.id,
       pathLower: file.path_lower,
       pathDisplay: file.path_display,
       name: file.name,
-      capturedAt: rest.capturedAt,
+      capturedAt: existing?.capturedAt ?? file.media_info?.metadata?.time_taken ?? file.client_modified,
       flag,
     };
   }
