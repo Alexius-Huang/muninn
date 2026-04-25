@@ -28,7 +28,7 @@ export function ThumbnailCell({ file, state, flag, isActive = false, ref, onClic
   }, [isActive]);
 
   const showRing = isActive || isLeaving;
-  const ringShadow = showRing ? 'inset 0 0 0 3px #88C0D0' : 'inset 0 0 0 0 #88C0D0';
+  const ringShadow = showRing ? 'inset 0 0 0 3px #81A1C1' : 'inset 0 0 0 0 #81A1C1';
   const flagShadow =
     flag === 'keep'
       ? '0 0 0 2px var(--color-nord-14), 0 0 10px 2px var(--color-nord-14)'
