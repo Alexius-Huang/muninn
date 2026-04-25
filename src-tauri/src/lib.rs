@@ -1,4 +1,5 @@
 mod curation;
+mod groups;
 mod keychain;
 mod oauth_callback;
 
@@ -16,6 +17,8 @@ pub fn run() {
       curation::read_curation,
       curation::write_curation,
       curation::list_curation,
+      groups::read_groups,
+      groups::write_groups,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

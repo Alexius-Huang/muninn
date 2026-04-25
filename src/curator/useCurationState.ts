@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { readCuration, writeCuration, migrateToIdKeys, type CurationFile, type CurationRecord, type Flag } from './curation';
+import { readCuration, writeCuration, migrateToIdKeys, applyFlag, type CurationFile, type Flag } from './curation';
 import type { DropboxFile } from '../dropbox/client';
 
 export type CurationStateReturn = {
@@ -81,20 +81,7 @@ export function useCurationState(folderPath: string | null, files: DropboxFile[]
   }, []);
 
   const setFlag = useCallback((file: DropboxFile, value: Flag | undefined) => {
-    const next = { ...recordsRef.current };
-    if (value === undefined) {
-      delete next[file.id];
-    } else {
-      const existing = recordsRef.current[file.id];
-      next[file.id] = {
-        photoId: file.id,
-        pathLower: file.path_lower,
-        pathDisplay: file.path_display,
-        name: file.name,
-        flag: value,
-        capturedAt: existing?.capturedAt ?? file.media_info?.metadata?.time_taken ?? file.client_modified,
-      } satisfies CurationRecord;
-    }
+    const next = applyFlag(recordsRef.current, file, value);
     recordsRef.current = next;
     setRecords({ ...recordsRef.current });
     dirtyRef.current = true;
@@ -129,8 +116,10 @@ export function useCurationState(folderPath: string | null, files: DropboxFile[]
   const flags = useMemo(
     () =>
       Object.fromEntries(
-        Object.entries(records).map(([k, r]) => [k, r.flag]),
-      ) as Record<string, Flag>,
+        Object.entries(records)
+          .filter(([, r]) => r.flag !== undefined)
+          .map(([k, r]) => [k, r.flag as Flag]),
+      ),
     [records],
   );
 

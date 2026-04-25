@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockInvoke = vi.fn();
 vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => mockInvoke(...args) }));
 
-import { readCuration, writeCuration, listCuration, migrateLegacyCurationFile, migrateToIdKeys } from './curation';
-import type { CurationFile } from './curation';
+import { readCuration, writeCuration, listCuration, migrateLegacyCurationFile, migrateToIdKeys, applyFlag, applyGroupId, clearGroupRefs } from './curation';
+import type { CurationFile, CurationRecord } from './curation';
 import type { DropboxFile } from '../dropbox/client';
 
 beforeEach(() => mockInvoke.mockReset());
@@ -216,5 +216,140 @@ describe('migrateToIdKeys', () => {
     expect(result.changed).toBe(false);
     expect(result.file).toBe(file);
     expect(result.droppedCount).toBe(0);
+  });
+});
+
+function makeFile(id: string, path = '/photos/lyon/a.jpg'): DropboxFile {
+  return {
+    '.tag': 'file',
+    name: 'a.jpg',
+    path_display: path,
+    path_lower: path,
+    id,
+    size: 1024,
+    server_modified: '2026-01-01T00:00:00Z',
+    client_modified: '2025-12-31T12:00:00Z',
+    media_info: { metadata: { time_taken: '2025-12-30T10:00:00Z' } },
+  };
+}
+
+describe('applyFlag', () => {
+  it.each([
+    ['keep' as const],
+    ['discard' as const],
+  ])('should add a new record with flag=%s', (flag) => {
+    const file = makeFile('id:a');
+    const result = applyFlag({}, file, flag);
+    expect(result['id:a'].flag).toBe(flag);
+    expect(result['id:a'].groupId).toBeUndefined();
+  });
+
+  it('should preserve capturedAt from the existing record when re-flagging', () => {
+    const existing: CurationRecord = { pathLower: '/p', pathDisplay: '/P', name: 'a.jpg', flag: 'keep', capturedAt: '2024-01-01T00:00:00Z' };
+    const file = makeFile('id:a');
+    const result = applyFlag({ 'id:a': existing }, file, 'discard');
+    expect(result['id:a'].capturedAt).toBe('2024-01-01T00:00:00Z');
+  });
+
+  it('should clear groupId when setting a flag (XOR invariant)', () => {
+    const existing: CurationRecord = { pathLower: '/p', pathDisplay: '/P', name: 'a.jpg', groupId: 'g1' };
+    const file = makeFile('id:a');
+    const result = applyFlag({ 'id:a': existing }, file, 'keep');
+    expect(result['id:a'].flag).toBe('keep');
+    expect(result['id:a'].groupId).toBeUndefined();
+  });
+
+  it('should delete the record when clearing flag on a record without groupId', () => {
+    const existing: CurationRecord = { pathLower: '/p', pathDisplay: '/P', name: 'a.jpg', flag: 'keep' };
+    const file = makeFile('id:a');
+    const result = applyFlag({ 'id:a': existing }, file, undefined);
+    expect(result['id:a']).toBeUndefined();
+  });
+
+  it('should keep the record with groupId only when clearing flag on a record that has groupId', () => {
+    const existing: CurationRecord = { pathLower: '/p', pathDisplay: '/P', name: 'a.jpg', flag: 'keep', groupId: 'g1' };
+    const file = makeFile('id:a');
+    const result = applyFlag({ 'id:a': existing }, file, undefined);
+    expect(result['id:a'].groupId).toBe('g1');
+    expect(result['id:a'].flag).toBeUndefined();
+  });
+});
+
+describe('applyGroupId', () => {
+  it('should add a new record with the given groupId', () => {
+    const file = makeFile('id:a');
+    const result = applyGroupId({}, file, 'g1');
+    expect(result['id:a'].groupId).toBe('g1');
+    expect(result['id:a'].flag).toBeUndefined();
+  });
+
+  it('should preserve capturedAt from the existing record', () => {
+    const existing: CurationRecord = { pathLower: '/p', pathDisplay: '/P', name: 'a.jpg', flag: 'keep', capturedAt: '2024-06-01T00:00:00Z' };
+    const file = makeFile('id:a');
+    const result = applyGroupId({ 'id:a': existing }, file, 'g1');
+    expect(result['id:a'].capturedAt).toBe('2024-06-01T00:00:00Z');
+  });
+
+  it('should clear flag when setting a groupId (XOR invariant)', () => {
+    const existing: CurationRecord = { pathLower: '/p', pathDisplay: '/P', name: 'a.jpg', flag: 'keep' };
+    const file = makeFile('id:a');
+    const result = applyGroupId({ 'id:a': existing }, file, 'g1');
+    expect(result['id:a'].groupId).toBe('g1');
+    expect(result['id:a'].flag).toBeUndefined();
+  });
+
+  it('should delete the record when clearing groupId on a record without flag', () => {
+    const existing: CurationRecord = { pathLower: '/p', pathDisplay: '/P', name: 'a.jpg', groupId: 'g1' };
+    const file = makeFile('id:a');
+    const result = applyGroupId({ 'id:a': existing }, file, undefined);
+    expect(result['id:a']).toBeUndefined();
+  });
+
+  it('should keep the record with flag only when clearing groupId on a record that has flag', () => {
+    const existing: CurationRecord = { pathLower: '/p', pathDisplay: '/P', name: 'a.jpg', flag: 'keep', groupId: 'g1' };
+    const file = makeFile('id:a');
+    const result = applyGroupId({ 'id:a': existing }, file, undefined);
+    expect(result['id:a'].flag).toBe('keep');
+    expect(result['id:a'].groupId).toBeUndefined();
+  });
+});
+
+describe('clearGroupRefs', () => {
+  it('should drop groupId from records matching the target groupId', () => {
+    const records: Record<string, CurationRecord> = {
+      'id:a': { pathLower: '/p', pathDisplay: '/P', name: 'a.jpg', flag: 'keep', groupId: 'g1' },
+    };
+    const { records: next, changed } = clearGroupRefs(structuredClone(records), 'g1');
+    expect(changed).toBe(true);
+    expect(next['id:a'].groupId).toBeUndefined();
+    expect(next['id:a'].flag).toBe('keep');
+  });
+
+  it('should delete records whose only field was the cleared groupId (no flag)', () => {
+    const records: Record<string, CurationRecord> = {
+      'id:b': { pathLower: '/p', pathDisplay: '/P', name: 'b.jpg', groupId: 'g1' },
+    };
+    const { records: next, changed } = clearGroupRefs(structuredClone(records), 'g1');
+    expect(changed).toBe(true);
+    expect(next['id:b']).toBeUndefined();
+  });
+
+  it('should leave non-matching records untouched', () => {
+    const records: Record<string, CurationRecord> = {
+      'id:a': { pathLower: '/p', pathDisplay: '/P', name: 'a.jpg', groupId: 'g2' },
+      'id:b': { pathLower: '/p', pathDisplay: '/P', name: 'b.jpg', flag: 'keep' },
+    };
+    const { records: next, changed } = clearGroupRefs(structuredClone(records), 'g1');
+    expect(changed).toBe(false);
+    expect(next['id:a'].groupId).toBe('g2');
+    expect(next['id:b'].flag).toBe('keep');
+  });
+
+  it('should return changed=false when no records matched', () => {
+    const records: Record<string, CurationRecord> = {
+      'id:a': { pathLower: '/p', pathDisplay: '/P', name: 'a.jpg', flag: 'keep' },
+    };
+    const { changed } = clearGroupRefs(structuredClone(records), 'g-none');
+    expect(changed).toBe(false);
   });
 });
