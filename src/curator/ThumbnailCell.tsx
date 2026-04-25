@@ -28,14 +28,13 @@ export function ThumbnailCell({ file, state, flag, isActive = false, ref, onClic
   }, [isActive]);
 
   const showRing = isActive || isLeaving;
-  const ringShadow = showRing ? 'inset 0 0 0 3px #88C0D0' : undefined;
+  const ringShadow = showRing ? 'inset 0 0 0 3px #88C0D0' : 'inset 0 0 0 0 #88C0D0';
   const flagShadow =
     flag === 'keep'
       ? '0 0 0 2px var(--color-nord-14), 0 0 10px 2px var(--color-nord-14)'
       : flag === 'discard'
         ? '0 0 0 2px var(--color-nord-11), 0 0 10px 2px var(--color-nord-11)'
         : undefined;
-  const boxShadow = [ringShadow, flagShadow].filter(Boolean).join(', ') || undefined;
 
   return (
     <button
@@ -49,7 +48,7 @@ export function ThumbnailCell({ file, state, flag, isActive = false, ref, onClic
         data-testid={flag ? `flag-${flag}` : undefined}
         data-leaving={isLeaving ? 'true' : undefined}
         className="relative w-40 h-40 rounded overflow-hidden bg-nord-2 flex items-center justify-center transition-shadow duration-200 motion-reduce:transition-none"
-        style={{ boxShadow }}
+        style={{ boxShadow: flagShadow }}
       >
         {state.tag === 'loading' && (
           <div
@@ -76,6 +75,11 @@ export function ThumbnailCell({ file, state, flag, isActive = false, ref, onClic
             <AlertTriangle className="h-5 w-5 text-red-500" />
           </div>
         )}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 rounded pointer-events-none transition-shadow duration-200 motion-reduce:transition-none"
+          style={{ boxShadow: ringShadow }}
+        />
       </div>
       <p className="w-full text-nord-4 text-xs truncate text-center leading-4" title={file.name}>{file.name}</p>
     </button>
