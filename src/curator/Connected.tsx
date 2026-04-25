@@ -42,7 +42,7 @@ export function Connected({ account, onDisconnect }: Props) {
 
   const cache = useThumbnailCache();
   const files = active ? sortFiles(active.entries) : [];
-  const { flags, setFlag, flush: flushBrowse } = useCurationState(active?.path ?? null, files);
+  const { flags, setFlag, clearAll, flush: flushBrowse } = useCurationState(active?.path ?? null, files);
 
   async function handleDisconnect() {
     if (!confirmingDisconnect) {
@@ -208,6 +208,7 @@ export function Connected({ account, onDisconnect }: Props) {
                   cache={cache}
                   flags={flags}
                   onSelect={setSelectedIndex}
+                  onClearAll={clearAll}
                 />
               )}
             </div>

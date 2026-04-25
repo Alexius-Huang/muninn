@@ -4,6 +4,14 @@ import { FlaggedGrid } from './FlaggedGrid';
 import { useAllFlagged } from './useAllFlagged';
 import type { ThumbnailCache } from './useThumbnailCache';
 import type { Flag } from './curation';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/shadcn/dialog';
 
 type Filter = 'all' | 'keep' | 'discard';
 
@@ -19,8 +27,9 @@ type Props = {
 export function FlaggedView({ isActive, cache, previewWidth, isResizing = false, onPreviewResize, onBeforeActivate }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { records, setFlag, reload, flush, loading } = useAllFlagged();
+  const { records, setFlag, clearAll, reload, flush, loading } = useAllFlagged();
 
   // On isActive false→true: flush Browse writes first, then reload
   const prevActiveRef = useRef(isActive);
@@ -101,6 +110,39 @@ export function FlaggedView({ isActive, cache, previewWidth, isResizing = false,
             {f === 'all' ? 'All' : f === 'keep' ? 'Keep' : 'Discard'}
           </button>
         ))}
+        <div className="ml-auto">
+          <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+            <button
+              onClick={() => setConfirmOpen(true)}
+              disabled={records.length === 0}
+              className="px-3 py-1 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Clear All
+            </button>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Clear all flags?</DialogTitle>
+                <DialogDescription>
+                  All keep/discard flags across every folder will be removed. No photos are deleted from Dropbox.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <button
+                  onClick={() => setConfirmOpen(false)}
+                  className="px-4 py-2 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { clearAll(); setSelectedIndex(null); setConfirmOpen(false); }}
+                  className="px-4 py-2 rounded-lg bg-nord-11 text-white hover:bg-red-600 transition-colors text-sm"
+                >
+                  Clear All
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 flex overflow-hidden">

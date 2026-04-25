@@ -10,6 +10,7 @@ export type FlatRecord = {
 export type AllFlaggedReturn = {
   records: FlatRecord[];
   setFlag: (folderPath: string, recordKey: string, value: Flag | undefined) => void;
+  clearAll: () => void;
   reload: () => Promise<void>;
   flush: () => Promise<void>;
   loading: boolean;
@@ -74,6 +75,18 @@ export function useAllFlagged(): AllFlaggedReturn {
     }
   }, []);
 
+  const clearAll = useCallback((): void => {
+    for (const timer of timersRef.current.values()) clearTimeout(timer);
+    timersRef.current.clear();
+    for (const [folderPath, recs] of filesRef.current) {
+      if (Object.keys(recs).length > 0) {
+        void writeCuration({ folderPath, records: {} });
+      }
+    }
+    filesRef.current = new Map(Array.from(filesRef.current.keys()).map((fp) => [fp, {}]));
+    setRecords([]);
+  }, []);
+
   const setFlag = useCallback((folderPath: string, recordKey: string, value: Flag | undefined) => {
     const current = filesRef.current.get(folderPath) ?? {};
     const next = { ...current };
@@ -107,5 +120,5 @@ export function useAllFlagged(): AllFlaggedReturn {
     return flush;
   }, [reload, flush]);
 
-  return { records, setFlag, reload, flush, loading };
+  return { records, setFlag, clearAll, reload, flush, loading };
 }
