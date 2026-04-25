@@ -20,3 +20,8 @@ class ResizeObserverPolyfill {
   disconnect() {}
 }
 (globalThis as Record<string, unknown>).ResizeObserver = ResizeObserverPolyfill;
+
+// jsdom does not implement scrollIntoView
+if (typeof Element !== 'undefined') {
+  Element.prototype.scrollIntoView = () => {};
+}

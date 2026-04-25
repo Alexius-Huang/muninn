@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import type { DropboxFile } from '../dropbox/client';
 import type { ThumbnailState } from './useThumbnailCache';
@@ -7,26 +8,48 @@ type Props = {
   file: DropboxFile;
   state: ThumbnailState;
   flag?: Flag;
+  isActive?: boolean;
+  ref?: React.Ref<HTMLButtonElement>;
   onClick: () => void;
 };
 
-export function ThumbnailCell({ file, state, flag, onClick }: Props) {
+export function ThumbnailCell({ file, state, flag, isActive = false, ref, onClick }: Props) {
+  const [isLeaving, setIsLeaving] = useState(false);
+  const prevActiveRef = useRef(isActive);
+
+  useEffect(() => {
+    const wasActive = prevActiveRef.current;
+    prevActiveRef.current = isActive;
+    if (wasActive && !isActive) {
+      setIsLeaving(true);
+      const timer = setTimeout(() => setIsLeaving(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isActive]);
+
+  const showRing = isActive || isLeaving;
+  const ringShadow = showRing ? 'inset 0 0 0 3px #88C0D0' : undefined;
+  const flagShadow =
+    flag === 'keep'
+      ? '0 0 0 2px var(--color-nord-14), 0 0 10px 2px var(--color-nord-14)'
+      : flag === 'discard'
+        ? '0 0 0 2px var(--color-nord-11), 0 0 10px 2px var(--color-nord-11)'
+        : undefined;
+  const boxShadow = [ringShadow, flagShadow].filter(Boolean).join(', ') || undefined;
+
   return (
     <button
+      ref={ref}
       className="w-40 shrink-0 flex flex-col gap-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-nord-8"
       onClick={onClick}
       aria-label={file.name}
+      aria-current={isActive ? 'true' : undefined}
     >
       <div
         data-testid={flag ? `flag-${flag}` : undefined}
-        className="relative w-40 h-40 rounded overflow-hidden bg-nord-2 flex items-center justify-center transition-shadow duration-200"
-        style={
-          flag === 'keep'
-            ? { boxShadow: '0 0 0 2px var(--color-nord-14), 0 0 10px 2px var(--color-nord-14)' }
-            : flag === 'discard'
-            ? { boxShadow: '0 0 0 2px var(--color-nord-11), 0 0 10px 2px var(--color-nord-11)' }
-            : undefined
-        }
+        data-leaving={isLeaving ? 'true' : undefined}
+        className="relative w-40 h-40 rounded overflow-hidden bg-nord-2 flex items-center justify-center transition-shadow duration-200 motion-reduce:transition-none"
+        style={{ boxShadow }}
       >
         {state.tag === 'loading' && (
           <div

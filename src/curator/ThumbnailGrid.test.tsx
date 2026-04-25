@@ -111,6 +111,44 @@ describe('ThumbnailGrid', () => {
     expect(onSelect).toHaveBeenCalledWith(1);
   });
 
+  it('should call scrollIntoView on the newly-active thumbnail when activeIndex changes', async () => {
+    const scrollIntoViewSpy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+    const entries = [makeFile('a.jpg', '/Lyon/a.jpg'), makeFile('b.jpg', '/Lyon/b.jpg')];
+    let rerender!: ReturnType<typeof render>['rerender'];
+
+    await act(async () => {
+      const result = render(
+        <ThumbnailGrid
+          path="/Lyon"
+          entries={entries}
+          cache={makeMockCache()}
+          flags={{}}
+          onSelect={vi.fn()}
+          activeIndex={null}
+        />,
+      );
+      rerender = result.rerender;
+    });
+
+    expect(scrollIntoViewSpy).not.toHaveBeenCalled();
+
+    await act(async () => {
+      rerender(
+        <ThumbnailGrid
+          path="/Lyon"
+          entries={entries}
+          cache={makeMockCache()}
+          flags={{}}
+          onSelect={vi.fn()}
+          activeIndex={1}
+        />,
+      );
+    });
+
+    expect(scrollIntoViewSpy).toHaveBeenCalled();
+    scrollIntoViewSpy.mockRestore();
+  });
+
   it('should render badges matching the flags prop', async () => {
     const entries = [makeFile('a.jpg', '/Lyon/a.jpg'), makeFile('b.jpg', '/Lyon/b.jpg')];
     const flags = { 'id:a.jpg': 'keep' as const };
