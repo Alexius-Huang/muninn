@@ -89,7 +89,7 @@ export function FlaggedGrid({ records, cache, activeIndex, onSelect }: Props) {
   }, [activeIndex, columns, virtualizer]);
 
   return (
-    <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto">
+    <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto scroll-smooth">
       <div
         style={{
           height: virtualizer.getTotalSize() + 16,
