@@ -187,39 +187,39 @@ describe('Connected', () => {
 describe('Connected > top tab bar', () => {
   it('should render Browse and Flagged tabs in the header', () => {
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
-    expect(screen.getByRole('button', { name: 'Browse' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Flagged' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Browse' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Flagged' })).toBeInTheDocument();
   });
 
   it('should default to the Browse tab on mount', () => {
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
-    expect(screen.getByRole('button', { name: 'Browse' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Flagged' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('tab', { name: 'Browse' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Flagged' })).toHaveAttribute('aria-selected', 'false');
   });
 
   it('should show the flagged empty state when the Flagged tab is clicked', async () => {
     const user = userEvent.setup();
     mockListCuration.mockResolvedValue([]);
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
-    await user.click(screen.getByRole('button', { name: 'Flagged' }));
+    await user.click(screen.getByRole('tab', { name: 'Flagged' }));
     await waitFor(() => expect(screen.getByText('No flagged photos yet')).toBeInTheDocument());
-    expect(document.querySelector('aside')?.parentElement).toHaveClass('hidden');
+    expect(document.querySelector('aside')?.parentElement).toHaveAttribute('data-state', 'inactive');
   });
 
   it('should restore the browse view when the Browse tab is clicked after switching to Flagged', async () => {
     const user = userEvent.setup();
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
-    await user.click(screen.getByRole('button', { name: 'Flagged' }));
-    await user.click(screen.getByRole('button', { name: 'Browse' }));
-    expect(document.querySelector('aside')?.parentElement).not.toHaveClass('hidden');
+    await user.click(screen.getByRole('tab', { name: 'Flagged' }));
+    await user.click(screen.getByRole('tab', { name: 'Browse' }));
+    expect(document.querySelector('aside')?.parentElement).toHaveAttribute('data-state', 'active');
   });
 
-  it('should mark the Flagged tab active (aria-pressed=true) after it is clicked', async () => {
+  it('should mark the Flagged tab active (aria-selected=true) after it is clicked', async () => {
     const user = userEvent.setup();
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
-    await user.click(screen.getByRole('button', { name: 'Flagged' }));
-    expect(screen.getByRole('button', { name: 'Flagged' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Browse' })).toHaveAttribute('aria-pressed', 'false');
+    await user.click(screen.getByRole('tab', { name: 'Flagged' }));
+    expect(screen.getByRole('tab', { name: 'Flagged' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Browse' })).toHaveAttribute('aria-selected', 'false');
   });
 
   it('should preserve the active folder when toggling tabs', async () => {
@@ -233,15 +233,15 @@ describe('Connected > top tab bar', () => {
     vi.mocked(listFolderAll).mockResolvedValue([]);
     await user.click(screen.getByRole('button', { name: 'Open Lyon' }));
     await waitFor(() => expect(screen.getByText(/0 photos in \/Lyon/)).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: 'Flagged' }));
-    await user.click(screen.getByRole('button', { name: 'Browse' }));
+    await user.click(screen.getByRole('tab', { name: 'Flagged' }));
+    await user.click(screen.getByRole('tab', { name: 'Browse' }));
     expect(screen.getByText(/0 photos in \/Lyon/)).toBeInTheDocument();
   });
 
   it('should call flush on Browse state when switching to Flagged', async () => {
     const user = userEvent.setup();
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
-    await user.click(screen.getByRole('button', { name: 'Flagged' }));
+    await user.click(screen.getByRole('tab', { name: 'Flagged' }));
     expect(mockFlushBrowse).toHaveBeenCalled();
   });
 
@@ -261,7 +261,7 @@ describe('Connected > top tab bar', () => {
       },
     ]);
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
-    await user.click(screen.getByRole('button', { name: 'Flagged' }));
+    await user.click(screen.getByRole('tab', { name: 'Flagged' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'a.jpg' })).toBeInTheDocument());
   });
 
@@ -280,7 +280,20 @@ describe('Connected > top tab bar', () => {
     await user.click(screen.getByRole('button', { name: 'photo.jpg' }));
     await waitFor(() => expect(screen.getByRole('button', { name: /close preview/i })).toBeInTheDocument());
     // Switch to Flagged — Browse PreviewPanel should be gone
-    await user.click(screen.getByRole('button', { name: 'Flagged' }));
+    await user.click(screen.getByRole('tab', { name: 'Flagged' }));
     expect(screen.queryByRole('button', { name: /close preview/i })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { key: '{ArrowRight}', expectActive: 'Flagged', expectInactive: 'Browse' },
+    { key: '{ArrowLeft}', expectActive: 'Flagged', expectInactive: 'Browse' },
+  ])('should move tab selection with $key arrow key', async ({ key, expectActive, expectInactive }) => {
+    const user = userEvent.setup();
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    const browseTab = screen.getByRole('tab', { name: 'Browse' });
+    browseTab.focus();
+    await user.keyboard(key);
+    expect(screen.getByRole('tab', { name: expectActive })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: expectInactive })).toHaveAttribute('aria-selected', 'false');
   });
 });

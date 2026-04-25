@@ -7,6 +7,7 @@ import { PreviewPanel } from './PreviewPanel';
 import { FlaggedView } from './FlaggedView';
 import { useThumbnailCache } from './useThumbnailCache';
 import { useCurationState } from './useCurationState';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shadcn/tabs';
 
 type Props = {
   account: DropboxAccount;
@@ -116,30 +117,35 @@ export function Connected({ account, onDisconnect }: Props) {
       : undefined;
 
   return (
-    <div className="h-full flex flex-col bg-nord-0">
-      <header className="flex items-center justify-between px-6 py-3 bg-nord-1 border-b border-nord-3 shrink-0">
-        <div>
+    <Tabs
+      value={tab}
+      onValueChange={(next) => {
+        if (next === 'flagged') flushBrowse();
+        setTab(next as 'browse' | 'flagged');
+      }}
+      className="h-full bg-nord-0 gap-0"
+    >
+      <header className="flex items-stretch justify-between px-6 h-12 bg-nord-1 border-b border-nord-3 shrink-0">
+        <div className="flex items-center">
           <span className="text-nord-6 font-medium text-sm">{account.name.display_name}</span>
           {account.email && (
             <span className="text-nord-4 text-sm ml-2">{account.email}</span>
           )}
         </div>
-        <div className="flex gap-1">
-          <button
-            aria-pressed={tab === 'browse'}
-            onClick={() => setTab('browse')}
-            className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${tab === 'browse' ? 'bg-nord-2 text-nord-6' : 'text-nord-4 hover:bg-nord-1'}`}
+        <TabsList className="h-full! bg-transparent! gap-1 p-0! rounded-none">
+          <TabsTrigger
+            value="browse"
+            className="h-full! items-center! rounded-none border-0! border-b-2! border-transparent px-4 text-sm font-medium shadow-none! bg-transparent! text-nord-4! hover:text-nord-6! hover:bg-nord-2! focus-visible:ring-0! focus-visible:outline-hidden after:hidden data-[state=active]:border-nord-8! data-[state=active]:text-nord-6! data-[state=active]:bg-transparent! data-[state=active]:hover:bg-nord-2! transition-colors -mb-px"
           >
             Browse
-          </button>
-          <button
-            aria-pressed={tab === 'flagged'}
-            onClick={() => setTab('flagged')}
-            className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${tab === 'flagged' ? 'bg-nord-2 text-nord-6' : 'text-nord-4 hover:bg-nord-1'}`}
+          </TabsTrigger>
+          <TabsTrigger
+            value="flagged"
+            className="h-full! items-center! rounded-none border-0! border-b-2! border-transparent px-4 text-sm font-medium shadow-none! bg-transparent! text-nord-4! hover:text-nord-6! hover:bg-nord-2! focus-visible:ring-0! focus-visible:outline-hidden after:hidden data-[state=active]:border-nord-8! data-[state=active]:text-nord-6! data-[state=active]:bg-transparent! data-[state=active]:hover:bg-nord-2! transition-colors -mb-px"
           >
             Flagged
-          </button>
-        </div>
+          </TabsTrigger>
+        </TabsList>
         {confirmingDisconnect ? (
           <div className="flex items-center gap-2">
             <span className="text-nord-4 text-sm">Disconnect?</span>
@@ -157,17 +163,23 @@ export function Connected({ account, onDisconnect }: Props) {
             </button>
           </div>
         ) : (
-          <button
-            onClick={handleDisconnect}
-            className="px-4 py-1.5 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
-          >
-            Disconnect
-          </button>
+          <div className="flex items-center">
+            <button
+              onClick={handleDisconnect}
+              className="px-4 py-1.5 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
+            >
+              Disconnect
+            </button>
+          </div>
         )}
       </header>
 
       <main className="flex-1 min-h-0 flex overflow-hidden">
-        <div className={`flex-1 min-h-0 flex overflow-hidden ${tab !== 'browse' ? 'hidden' : ''}`}>
+        <TabsContent
+          value="browse"
+          forceMount
+          className="flex-1 min-h-0 flex overflow-hidden data-[state=inactive]:hidden"
+        >
           <aside
             style={{ width: sidebarWidth }}
             className="shrink-0 overflow-y-auto bg-nord-0"
@@ -222,10 +234,14 @@ export function Connected({ account, onDisconnect }: Props) {
               </>
             )}
           </section>
-        </div>
+        </TabsContent>
 
-        {/* Keep FlaggedView mounted (not conditionally rendered) so useAllFlagged stays alive for the isActive edge trigger */}
-        <div className={`flex-1 min-h-0 flex overflow-hidden ${tab !== 'flagged' ? 'hidden' : ''}`}>
+        {/* forceMount keeps FlaggedView alive so useAllFlagged's isActive edge trigger still fires on tab change */}
+        <TabsContent
+          value="flagged"
+          forceMount
+          className="flex-1 min-h-0 flex overflow-hidden data-[state=inactive]:hidden"
+        >
           <FlaggedView
             isActive={tab === 'flagged'}
             cache={cache}
@@ -234,8 +250,8 @@ export function Connected({ account, onDisconnect }: Props) {
             onPreviewResize={handlePreviewResizeStart}
             onBeforeActivate={flushBrowse}
           />
-        </div>
+        </TabsContent>
       </main>
-    </div>
+    </Tabs>
   );
 }
