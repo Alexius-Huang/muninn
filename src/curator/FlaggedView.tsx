@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { wrapIndex, jumpRow } from './navigate';
 import { PreviewPanel } from './PreviewPanel';
 import type { NavigateDirection } from './PreviewPanel';
 import { FlaggedGrid } from './FlaggedGrid';
-import { useAllFlagged } from './useAllFlagged';
+import type { AllFlaggedReturn } from './useAllFlagged';
 import type { ThumbnailCache } from './useThumbnailCache';
 import type { Flag } from './curation';
 import {
@@ -17,40 +17,19 @@ import {
 
 type Filter = 'all' | 'keep' | 'discard';
 
-type Props = {
+type Props = Pick<AllFlaggedReturn, 'records' | 'setFlag' | 'clearAll' | 'loading'> & {
   isActive: boolean;
   cache: ThumbnailCache;
   previewWidth: number;
   isResizing?: boolean;
   onPreviewResize: (e: React.MouseEvent) => void;
-  onBeforeActivate: () => Promise<void>;
 };
 
-export function FlaggedView({ isActive, cache, previewWidth, isResizing = false, onPreviewResize, onBeforeActivate }: Props) {
+export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cache, previewWidth, isResizing = false, onPreviewResize }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [columns, setColumns] = useState(4);
   const [confirmOpen, setConfirmOpen] = useState(false);
-
-  const { records, setFlag, clearAll, reload, flush, loading } = useAllFlagged();
-
-  // On isActive false→true: flush Browse writes first, then reload
-  const prevActiveRef = useRef(isActive);
-
-  useEffect(() => {
-    if (isActive && !prevActiveRef.current) {
-      void (async () => {
-        await onBeforeActivate();
-        await reload();
-      })();
-    }
-    prevActiveRef.current = isActive;
-  }, [isActive, reload, onBeforeActivate]);
-
-  // Flush our own pending writes when we become inactive
-  useEffect(() => {
-    if (!isActive) flush();
-  }, [isActive, flush]);
 
   const filtered = filter === 'all' ? records : records.filter((r) => r.record.flag === filter);
 

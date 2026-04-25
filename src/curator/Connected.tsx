@@ -7,6 +7,7 @@ import { PreviewPanel } from './PreviewPanel';
 import { FlaggedView } from './FlaggedView';
 import { useThumbnailCache } from './useThumbnailCache';
 import { useCurationState } from './useCurationState';
+import { useAllFlagged } from './useAllFlagged';
 import { wrapIndex, jumpRow } from './navigate';
 import type { NavigateDirection } from './PreviewPanel';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shadcn/tabs';
@@ -42,10 +43,12 @@ export function Connected({ account, onDisconnect }: Props) {
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const pendingTabRef = useRef<'browse' | 'flagged' | null>(null);
 
   const cache = useThumbnailCache();
   const files = active ? sortFiles(active.entries) : [];
-  const { flags, setFlag, clearAll, flush: flushBrowse } = useCurationState(active?.path ?? null, files);
+  const { flags, setFlag, clearAll, flush: flushBrowse, reload: reloadBrowse } = useCurationState(active?.path ?? null, files);
+  const { records: flaggedRecords, setFlag: setFlaggedFlag, clearAll: clearAllFlagged, flush: flushFlagged, reload: reloadFlagged, loading: flaggedLoading } = useAllFlagged();
 
   async function handleDisconnect() {
     if (!confirmingDisconnect) {
@@ -126,9 +129,19 @@ export function Connected({ account, onDisconnect }: Props) {
   return (
     <Tabs
       value={tab}
-      onValueChange={(next) => {
-        if (next === 'flagged') flushBrowse();
-        setTab(next as 'browse' | 'flagged');
+      onValueChange={async (next) => {
+        const target = next as 'browse' | 'flagged';
+        if (target === tab || target === pendingTabRef.current) return;
+        pendingTabRef.current = target;
+        if (target === 'flagged') {
+          await flushBrowse();
+          await reloadFlagged();
+        } else {
+          await flushFlagged();
+          await reloadBrowse();
+        }
+        pendingTabRef.current = null;
+        setTab(target);
       }}
       className="h-full bg-nord-0 gap-0"
     >
@@ -246,19 +259,21 @@ export function Connected({ account, onDisconnect }: Props) {
           </section>
         </TabsContent>
 
-        {/* forceMount keeps FlaggedView alive so useAllFlagged's isActive edge trigger still fires on tab change */}
         <TabsContent
           value="flagged"
           forceMount
           className="flex-1 min-h-0 flex overflow-hidden data-[state=inactive]:hidden"
         >
           <FlaggedView
+            records={flaggedRecords}
+            setFlag={setFlaggedFlag}
+            clearAll={clearAllFlagged}
+            loading={flaggedLoading}
             isActive={tab === 'flagged'}
             cache={cache}
             previewWidth={previewWidth}
             isResizing={isDraggingPreview}
             onPreviewResize={handlePreviewResizeStart}
-            onBeforeActivate={flushBrowse}
           />
         </TabsContent>
       </main>

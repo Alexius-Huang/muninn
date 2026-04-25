@@ -7,6 +7,7 @@ export type CurationStateReturn = {
   setFlag: (file: DropboxFile, value: Flag | undefined) => void;
   clearAll: () => void;
   flush: () => Promise<void>;
+  reload: () => Promise<void>;
 };
 
 export function useCurationState(folderPath: string | null, files: DropboxFile[]): CurationStateReturn {
@@ -108,6 +109,23 @@ export function useCurationState(folderPath: string | null, files: DropboxFile[]
     }, 250);
   }, []);
 
+  const reload = useCallback(async (): Promise<void> => {
+    const folderPath = folderPathRef.current;
+    if (!folderPath) return;
+    await flush();
+    const file = await readCuration(folderPath);
+    let loaded = file?.records ?? {};
+    if (filesRef.current.length > 0 && file) {
+      const result = migrateToIdKeys({ folderPath, records: loaded }, filesRef.current);
+      if (result.changed) {
+        loaded = result.file.records;
+        void writeCuration({ folderPath, records: loaded });
+      }
+    }
+    recordsRef.current = loaded;
+    setRecords(loaded);
+  }, [flush]);
+
   const flags = useMemo(
     () =>
       Object.fromEntries(
@@ -116,5 +134,5 @@ export function useCurationState(folderPath: string | null, files: DropboxFile[]
     [records],
   );
 
-  return { flags, setFlag, clearAll, flush };
+  return { flags, setFlag, clearAll, flush, reload };
 }

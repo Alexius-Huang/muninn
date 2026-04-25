@@ -215,4 +215,50 @@ describe('useCurationState', () => {
     });
     expect(mockWriteCuration).toHaveBeenCalledOnce();
   });
+
+  it('should expose a reload that re-reads disk records into memory', async () => {
+    mockReadCuration.mockResolvedValue({
+      folderPath: '/Photos/Lyon',
+      records: {
+        'id:a.jpg': { photoId: 'id:a.jpg', pathLower: '/photos/lyon/a.jpg', pathDisplay: '/Photos/Lyon/a.jpg', name: 'a.jpg', flag: 'keep' },
+      },
+    });
+    const { result } = renderHook(() => useCurationState('/Photos/Lyon', []));
+    await act(async () => {});
+    expect(result.current.flags['id:a.jpg']).toBe('keep');
+
+    mockReadCuration.mockResolvedValue({
+      folderPath: '/Photos/Lyon',
+      records: {
+        'id:b.jpg': { photoId: 'id:b.jpg', pathLower: '/photos/lyon/b.jpg', pathDisplay: '/Photos/Lyon/b.jpg', name: 'b.jpg', flag: 'discard' },
+      },
+    });
+    await act(async () => { await result.current.reload(); });
+    expect(result.current.flags['id:a.jpg']).toBeUndefined();
+    expect(result.current.flags['id:b.jpg']).toBe('discard');
+  });
+
+  it('should be a no-op when reload is called with no active folder', async () => {
+    const { result } = renderHook(() => useCurationState(null, []));
+    await act(async () => {});
+    const callCountBefore = mockReadCuration.mock.calls.length;
+    await act(async () => { await result.current.reload(); });
+    expect(mockReadCuration.mock.calls.length).toBe(callCountBefore);
+  });
+
+  it('should flush pending writes before re-reading on reload', async () => {
+    const callOrder: string[] = [];
+    mockWriteCuration.mockImplementation(async () => { callOrder.push('write'); });
+    mockReadCuration.mockImplementation(async () => { callOrder.push('read'); return null; });
+    const file = makeFile('a.jpg', '/Photos/Lyon/a.jpg');
+    const { result } = renderHook(() => useCurationState('/Photos/Lyon', []));
+    await act(async () => {});
+    callOrder.length = 0;
+    act(() => { result.current.setFlag(file, 'keep'); });
+    await act(async () => { await result.current.reload(); });
+    const writeIdx = callOrder.indexOf('write');
+    const readIdx = callOrder.lastIndexOf('read');
+    expect(writeIdx).toBeGreaterThanOrEqual(0);
+    expect(writeIdx).toBeLessThan(readIdx);
+  });
 });

@@ -7,8 +7,12 @@ import { Connected } from './Connected';
 const mockDisconnect = vi.fn();
 const mockSetFlag = vi.fn();
 const mockFlushBrowse = vi.fn();
+const mockReloadBrowse = vi.fn();
+const mockFlushFlagged = vi.fn();
+const mockReloadFlagged = vi.fn();
 const mockListCuration = vi.fn();
 const mockWriteCuration = vi.fn();
+let mockFlaggedRecords: unknown[] = [];
 
 vi.mock('../auth/dropboxAuth', () => ({
   disconnect: (...args: unknown[]) => mockDisconnect(...args),
@@ -25,7 +29,11 @@ vi.mock('../dropbox/client', async (importOriginal) => {
 });
 
 vi.mock('./useCurationState', () => ({
-  useCurationState: vi.fn(() => ({ flags: {}, setFlag: mockSetFlag, flush: mockFlushBrowse })),
+  useCurationState: vi.fn(() => ({ flags: {}, setFlag: mockSetFlag, flush: mockFlushBrowse, reload: mockReloadBrowse })),
+}));
+
+vi.mock('./useAllFlagged', () => ({
+  useAllFlagged: vi.fn(() => ({ records: mockFlaggedRecords, setFlag: vi.fn(), clearAll: vi.fn(), flush: mockFlushFlagged, reload: mockReloadFlagged, loading: false })),
 }));
 
 vi.mock('./curation', () => ({
@@ -68,10 +76,18 @@ beforeEach(() => {
   mockDisconnect.mockResolvedValue(undefined);
   mockSetFlag.mockReset();
   mockFlushBrowse.mockReset();
+  mockFlushBrowse.mockResolvedValue(undefined);
+  mockReloadBrowse.mockReset();
+  mockReloadBrowse.mockResolvedValue(undefined);
+  mockFlushFlagged.mockReset();
+  mockFlushFlagged.mockResolvedValue(undefined);
+  mockReloadFlagged.mockReset();
+  mockReloadFlagged.mockResolvedValue(undefined);
   mockListCuration.mockReset();
   mockWriteCuration.mockReset();
   mockListCuration.mockResolvedValue([]);
   mockWriteCuration.mockResolvedValue(undefined);
+  mockFlaggedRecords = [];
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
@@ -246,21 +262,24 @@ describe('Connected > top tab bar', () => {
     expect(mockFlushBrowse).toHaveBeenCalled();
   });
 
+  it('should flush Flagged then reload Browse when switching from Flagged to Browse', async () => {
+    const user = userEvent.setup();
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    await user.click(screen.getByRole('tab', { name: 'Flagged' }));
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Flagged' })).toHaveAttribute('aria-selected', 'true'));
+    mockReloadBrowse.mockClear();
+    await user.click(screen.getByRole('tab', { name: 'Browse' }));
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Browse' })).toHaveAttribute('aria-selected', 'true'));
+    expect(mockReloadBrowse).toHaveBeenCalledOnce();
+  });
+
   it('should show a flagged photo in Flagged tab after it was flagged in Browse', async () => {
     const user = userEvent.setup();
-    mockListCuration.mockResolvedValue([
-      {
-        folderPath: '/Photos/Lyon',
-        records: {
-          '/photos/lyon/a.jpg': {
-            pathLower: '/photos/lyon/a.jpg',
-            pathDisplay: '/Photos/Lyon/a.jpg',
-            name: 'a.jpg',
-            flag: 'keep',
-          },
-        },
-      },
-    ]);
+    mockFlaggedRecords = [{
+      folderPath: '/Photos/Lyon',
+      key: '/photos/lyon/a.jpg',
+      record: { pathLower: '/photos/lyon/a.jpg', pathDisplay: '/Photos/Lyon/a.jpg', name: 'a.jpg', flag: 'keep' },
+    }];
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await user.click(screen.getByRole('tab', { name: 'Flagged' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'a.jpg' })).toBeInTheDocument());

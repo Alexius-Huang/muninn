@@ -166,4 +166,34 @@ describe('ThumbnailGrid', () => {
     expect(screen.getByTestId('flag-keep')).toBeInTheDocument();
     expect(screen.queryByTestId('flag-discard')).not.toBeInTheDocument();
   });
+
+  it('should remove the flag indicator from a tile when its flag is cleared', async () => {
+    const entries = [makeFile('a.jpg', '/Lyon/a.jpg')];
+    let rerender!: ReturnType<typeof render>['rerender'];
+    await act(async () => {
+      const result = render(
+        <ThumbnailGrid
+          path="/Lyon"
+          entries={entries}
+          cache={makeMockCache()}
+          flags={{ 'id:a.jpg': 'keep' }}
+          onSelect={vi.fn()}
+        />,
+      );
+      rerender = result.rerender;
+    });
+    expect(screen.getByTestId('flag-keep')).toBeInTheDocument();
+    await act(async () => {
+      rerender(
+        <ThumbnailGrid
+          path="/Lyon"
+          entries={entries}
+          cache={makeMockCache()}
+          flags={{}}
+          onSelect={vi.fn()}
+        />,
+      );
+    });
+    expect(screen.queryByTestId('flag-keep')).not.toBeInTheDocument();
+  });
 });
