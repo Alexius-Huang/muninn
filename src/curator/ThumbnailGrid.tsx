@@ -4,6 +4,14 @@ import type { DropboxEntry, DropboxFile } from '../dropbox/client';
 import type { ThumbnailCache } from './useThumbnailCache';
 import { ThumbnailCell } from './ThumbnailCell';
 import type { CurationFlags } from './curation';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/shadcn/dialog';
 
 const CELL_SIZE = 160;
 const LABEL_HEIGHT = 20;
@@ -46,6 +54,7 @@ type Props = {
   cache: ThumbnailCache;
   flags: CurationFlags;
   onSelect: (index: number) => void;
+  onClearAll?: () => void;
 };
 
 export function sortFiles(entries: DropboxEntry[]): DropboxFile[] {
@@ -54,9 +63,11 @@ export function sortFiles(entries: DropboxEntry[]): DropboxFile[] {
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
-export function ThumbnailGrid({ path, entries, cache, flags, onSelect }: Props) {
+export function ThumbnailGrid({ path, entries, cache, flags, onSelect, onClearAll }: Props) {
   const files = sortFiles(entries);
   const displayPath = path === '' ? '/' : path;
+  const flagCount = Object.keys(flags).length;
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const parentRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(4);
@@ -87,10 +98,43 @@ export function ThumbnailGrid({ path, entries, cache, flags, onSelect }: Props) 
   return (
     <CacheContext.Provider value={cache}>
       <div className="flex flex-col h-full">
-        <div className="shrink-0 px-6 pt-4 pb-3 bg-nord-0 border-b border-nord-3">
+        <div className="shrink-0 px-6 pt-4 pb-3 bg-nord-0 border-b border-nord-3 flex items-center justify-between">
           <h2 className="text-nord-6 font-semibold text-lg">
             {files.length} photos in {displayPath}
           </h2>
+          {onClearAll && (
+            <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+              <button
+                onClick={() => setConfirmOpen(true)}
+                disabled={flagCount === 0}
+                className="px-3 py-1 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Clear All
+              </button>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Clear all flags?</DialogTitle>
+                  <DialogDescription>
+                    All keep/discard flags for this folder will be removed. No photos are deleted from Dropbox.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <button
+                    onClick={() => setConfirmOpen(false)}
+                    className="px-4 py-2 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => { onClearAll(); setConfirmOpen(false); }}
+                    className="px-4 py-2 rounded-lg bg-nord-11 text-white hover:bg-red-600 transition-colors text-sm"
+                  >
+                    Clear All
+                  </button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         {files.length === 0 ? (
