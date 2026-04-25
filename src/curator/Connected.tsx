@@ -7,6 +7,7 @@ import { PreviewPanel } from './PreviewPanel';
 import { FlaggedView } from './FlaggedView';
 import { useThumbnailCache } from './useThumbnailCache';
 import { useCurationState } from './useCurationState';
+import { wrapIndex } from './navigate';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shadcn/tabs';
 
 type Props = {
@@ -102,9 +103,8 @@ export function Connected({ account, onDisconnect }: Props) {
   }
 
   function handleNavigate(delta: -1 | 1) {
-    if (selectedIndex === null) return;
-    const next = selectedIndex + delta;
-    if (next >= 0 && next < files.length) setSelectedIndex(next);
+    if (selectedIndex === null || files.length === 0) return;
+    setSelectedIndex(wrapIndex(selectedIndex, delta, files.length));
   }
 
   const selectedFile = selectedIndex !== null ? files[selectedIndex] : null;

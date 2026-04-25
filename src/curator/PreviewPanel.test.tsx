@@ -142,4 +142,13 @@ describe('PreviewPanel', () => {
     render(<PreviewPanel {...defaultProps({ index: 1, total: 10 })} />);
     expect(screen.getByText('2 / 10')).toBeInTheDocument();
   });
+
+  it.each([
+    { label: 'first photo', index: 0, total: 3 },
+    { label: 'last photo', index: 2, total: 3 },
+  ])('should render Prev and Next without disabled at the $label', ({ index, total }) => {
+    render(<PreviewPanel {...defaultProps({ index, total })} />);
+    expect(screen.getByRole('button', { name: /previous photo/i })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /next photo/i })).not.toBeDisabled();
+  });
 });
