@@ -2,15 +2,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
+// Stub Tauri IPC so importActual on ./curation doesn't blow up at import time
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
+
 const mockReadCuration = vi.fn();
 const mockWriteCuration = vi.fn();
 const mockMigrateToIdKeys = vi.fn();
 
-vi.mock('./curation', () => ({
-  readCuration: (...args: unknown[]) => mockReadCuration(...args),
-  writeCuration: (...args: unknown[]) => mockWriteCuration(...args),
-  migrateToIdKeys: (...args: unknown[]) => mockMigrateToIdKeys(...args),
-}));
+vi.mock('./curation', async () => {
+  const actual = await vi.importActual<typeof import('./curation')>('./curation');
+  return {
+    ...actual,
+    readCuration: (...args: unknown[]) => mockReadCuration(...args),
+    writeCuration: (...args: unknown[]) => mockWriteCuration(...args),
+    migrateToIdKeys: (...args: unknown[]) => mockMigrateToIdKeys(...args),
+  };
+});
 
 import { useCurationState } from './useCurationState';
 
@@ -260,5 +267,22 @@ describe('useCurationState', () => {
     const readIdx = callOrder.lastIndexOf('read');
     expect(writeIdx).toBeGreaterThanOrEqual(0);
     expect(writeIdx).toBeLessThan(readIdx);
+  });
+
+  it('should clear groupId when setFlag is called on a record that previously had a groupId', async () => {
+    mockReadCuration.mockResolvedValue({
+      folderPath: '/Photos/Lyon',
+      records: {
+        'id:a.jpg': { photoId: 'id:a.jpg', pathLower: '/photos/lyon/a.jpg', pathDisplay: '/Photos/Lyon/a.jpg', name: 'a.jpg', groupId: 'g1' },
+      },
+    });
+    const file = makeFile('a.jpg', '/Photos/Lyon/a.jpg');
+    const { result } = renderHook(() => useCurationState('/Photos/Lyon', []));
+    await act(async () => {});
+    act(() => { result.current.setFlag(file, 'keep'); });
+    await act(async () => { vi.advanceTimersByTime(250); });
+    const written = mockWriteCuration.mock.calls[0][0].records['id:a.jpg'];
+    expect(written.flag).toBe('keep');
+    expect(written.groupId).toBeUndefined();
   });
 });

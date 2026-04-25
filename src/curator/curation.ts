@@ -4,12 +4,15 @@ import type { DropboxFile } from '../dropbox/client';
 export type Flag = 'keep' | 'discard';
 export type CurationFlags = Record<string, Flag>;
 
+// XOR invariant: a record has at most one of { flag, groupId }.
+// Always mutate records through applyFlag / applyGroupId to uphold this.
 export type CurationRecord = {
   photoId?: string;
   pathLower: string;
   pathDisplay: string;
   name: string;
-  flag: Flag;
+  flag?: Flag;
+  groupId?: string;
   capturedAt?: string;
 };
 
@@ -103,4 +106,78 @@ export async function writeCuration(file: CurationFile): Promise<void> {
 export async function listCuration(): Promise<CurationFile[]> {
   const blobs = await invoke<string[]>('list_curation');
   return blobs.map((blob) => migrateLegacyCurationFile(JSON.parse(blob)));
+}
+
+export function applyFlag(
+  records: Record<string, CurationRecord>,
+  file: DropboxFile,
+  flag: Flag | undefined,
+): Record<string, CurationRecord> {
+  const next = { ...records };
+  const existing = records[file.id];
+  if (flag === undefined) {
+    if (existing?.groupId) {
+      const { flag: _f, ...rest } = existing;
+      next[file.id] = rest;
+    } else {
+      delete next[file.id];
+    }
+  } else {
+    next[file.id] = {
+      photoId: file.id,
+      pathLower: file.path_lower,
+      pathDisplay: file.path_display,
+      name: file.name,
+      capturedAt: existing?.capturedAt ?? file.media_info?.metadata?.time_taken ?? file.client_modified,
+      flag,
+    };
+  }
+  return next;
+}
+
+export function applyGroupId(
+  records: Record<string, CurationRecord>,
+  file: DropboxFile,
+  groupId: string | undefined,
+): Record<string, CurationRecord> {
+  const next = { ...records };
+  const existing = records[file.id];
+  if (groupId === undefined) {
+    if (existing?.flag) {
+      const { groupId: _g, ...rest } = existing;
+      next[file.id] = rest;
+    } else {
+      delete next[file.id];
+    }
+  } else {
+    next[file.id] = {
+      photoId: file.id,
+      pathLower: file.path_lower,
+      pathDisplay: file.path_display,
+      name: file.name,
+      capturedAt: existing?.capturedAt ?? file.media_info?.metadata?.time_taken ?? file.client_modified,
+      groupId,
+    };
+  }
+  return next;
+}
+
+export function clearGroupRefs(
+  records: Record<string, CurationRecord>,
+  groupId: string,
+): { records: Record<string, CurationRecord>; changed: boolean } {
+  let changed = false;
+  const next = { ...records };
+  for (const [key, record] of Object.entries(next)) {
+    if (record.groupId === groupId) {
+      changed = true;
+      if (record.flag) {
+        const { groupId: _g, ...rest } = record;
+        next[key] = rest;
+      } else {
+        delete next[key];
+      }
+    }
+  }
+  return { records: next, changed };
 }
