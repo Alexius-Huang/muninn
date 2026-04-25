@@ -163,17 +163,15 @@ export function PreviewPanel({
       <div className="shrink-0 flex items-center justify-between px-3 pb-3">
         <button
           onClick={() => onNavigate(-1)}
-          disabled={index === 0}
           aria-label="Previous photo"
-          className="flex items-center gap-1 px-2 py-1 rounded text-nord-4 hover:text-nord-6 hover:bg-nord-3 disabled:opacity-30 disabled:cursor-default transition-colors text-sm"
+          className="flex items-center gap-1 px-2 py-1 rounded text-nord-4 hover:text-nord-6 hover:bg-nord-3 transition-colors text-sm"
         >
           <ChevronLeft size={14} /> Prev
         </button>
         <button
           onClick={() => onNavigate(1)}
-          disabled={index === total - 1}
           aria-label="Next photo"
-          className="flex items-center gap-1 px-2 py-1 rounded text-nord-4 hover:text-nord-6 hover:bg-nord-3 disabled:opacity-30 disabled:cursor-default transition-colors text-sm"
+          className="flex items-center gap-1 px-2 py-1 rounded text-nord-4 hover:text-nord-6 hover:bg-nord-3 transition-colors text-sm"
         >
           Next <ChevronRight size={14} />
         </button>

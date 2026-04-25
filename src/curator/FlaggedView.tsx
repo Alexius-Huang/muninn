@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PreviewPanel } from './PreviewPanel';
 import { FlaggedGrid } from './FlaggedGrid';
 import { useAllFlagged } from './useAllFlagged';
+import { wrapIndex } from './navigate';
 import type { ThumbnailCache } from './useThumbnailCache';
 import type { Flag } from './curation';
 import {
@@ -54,9 +55,8 @@ export function FlaggedView({ isActive, cache, previewWidth, isResizing = false,
   const selectedFlat = selectedIndex !== null ? filtered[selectedIndex] : null;
 
   function handleNavigate(delta: -1 | 1) {
-    if (selectedIndex === null) return;
-    const next = selectedIndex + delta;
-    if (next >= 0 && next < filtered.length) setSelectedIndex(next);
+    if (selectedIndex === null || filtered.length === 0) return;
+    setSelectedIndex(wrapIndex(selectedIndex, delta, filtered.length));
   }
 
   function handleFlag(value: Flag | undefined) {

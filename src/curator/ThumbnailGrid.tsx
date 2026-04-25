@@ -158,7 +158,7 @@ export function ThumbnailGrid({ path, entries, cache, flags, activeIndex, onSele
             <p className="text-nord-4 text-sm">No photos in this folder</p>
           </div>
         ) : (
-          <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto">
+          <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto scroll-smooth">
             <div
               style={{
                 height: virtualizer.getTotalSize() + 16,
