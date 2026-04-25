@@ -28,13 +28,16 @@ function useCacheContext(): ThumbnailCache {
 function ConnectedCell({
   file,
   flag,
+  isActive,
   onSelect,
 }: {
   file: DropboxFile;
   flag: CurationFlags[string] | undefined;
+  isActive: boolean;
   onSelect: () => void;
 }) {
   const cache = useCacheContext();
+  const cellRef = useRef<HTMLButtonElement>(null);
 
   const state = useSyncExternalStore(
     (cb) => cache.subscribe(file.path_lower, cb),
@@ -45,7 +48,13 @@ function ConnectedCell({
     cache.request(file.path_display);
   }, [file.path_display, cache]);
 
-  return <ThumbnailCell file={file} state={state} flag={flag} onClick={onSelect} />;
+  useEffect(() => {
+    if (isActive) {
+      cellRef.current?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    }
+  }, [isActive]);
+
+  return <ThumbnailCell ref={cellRef} file={file} state={state} flag={flag} isActive={isActive} onClick={onSelect} />;
 }
 
 type Props = {
@@ -53,6 +62,7 @@ type Props = {
   entries: DropboxEntry[];
   cache: ThumbnailCache;
   flags: CurationFlags;
+  activeIndex?: number | null;
   onSelect: (index: number) => void;
   onClearAll?: () => void;
 };
@@ -63,7 +73,7 @@ export function sortFiles(entries: DropboxEntry[]): DropboxFile[] {
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
-export function ThumbnailGrid({ path, entries, cache, flags, onSelect, onClearAll }: Props) {
+export function ThumbnailGrid({ path, entries, cache, flags, activeIndex, onSelect, onClearAll }: Props) {
   const files = sortFiles(entries);
   const displayPath = path === '' ? '/' : path;
   const flagCount = Object.keys(flags).length;
@@ -94,6 +104,12 @@ export function ThumbnailGrid({ path, entries, cache, flags, onSelect, onClearAl
     estimateSize: () => CELL_SIZE + LABEL_HEIGHT + GAP,
     overscan: 4,
   });
+
+  useEffect(() => {
+    if (activeIndex == null || columns === 0) return;
+    const rowIndex = Math.floor(activeIndex / columns);
+    virtualizer.scrollToIndex(rowIndex, { align: 'auto' });
+  }, [activeIndex, columns, virtualizer]);
 
   return (
     <CacheContext.Provider value={cache}>
@@ -171,6 +187,7 @@ export function ThumbnailGrid({ path, entries, cache, flags, onSelect, onClearAl
                         key={file.path_lower}
                         file={file}
                         flag={flags[file.id]}
+                        isActive={activeIndex === startIndex + colIdx}
                         onSelect={() => onSelect(startIndex + colIdx)}
                       />
                     ))}

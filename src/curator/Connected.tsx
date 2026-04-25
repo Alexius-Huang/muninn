@@ -207,6 +207,7 @@ export function Connected({ account, onDisconnect }: Props) {
                   entries={active.entries}
                   cache={cache}
                   flags={flags}
+                  activeIndex={selectedIndex}
                   onSelect={setSelectedIndex}
                   onClearAll={clearAll}
                 />

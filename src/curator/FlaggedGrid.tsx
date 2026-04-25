@@ -11,11 +11,13 @@ const GAP = 8;
 type CellProps = {
   flat: FlatRecord;
   cache: ThumbnailCache;
+  isActive: boolean;
   onSelect: () => void;
 };
 
-function GridCell({ flat, cache, onSelect }: CellProps) {
+function GridCell({ flat, cache, isActive, onSelect }: CellProps) {
   const { record } = flat;
+  const cellRef = useRef<HTMLButtonElement>(null);
 
   const state = useSyncExternalStore(
     (cb) => cache.subscribe(record.pathLower, cb),
@@ -25,6 +27,12 @@ function GridCell({ flat, cache, onSelect }: CellProps) {
   useEffect(() => {
     cache.request(record.pathDisplay);
   }, [record.pathDisplay, cache]);
+
+  useEffect(() => {
+    if (isActive) {
+      cellRef.current?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    }
+  }, [isActive]);
 
   const file = {
     '.tag': 'file' as const,
@@ -37,16 +45,17 @@ function GridCell({ flat, cache, onSelect }: CellProps) {
     client_modified: '',
   };
 
-  return <ThumbnailCell file={file} state={state} flag={record.flag} onClick={onSelect} />;
+  return <ThumbnailCell ref={cellRef} file={file} state={state} flag={record.flag} isActive={isActive} onClick={onSelect} />;
 }
 
 type Props = {
   records: FlatRecord[];
   cache: ThumbnailCache;
+  activeIndex?: number | null;
   onSelect: (index: number) => void;
 };
 
-export function FlaggedGrid({ records, cache, onSelect }: Props) {
+export function FlaggedGrid({ records, cache, activeIndex, onSelect }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(4);
 
@@ -72,6 +81,12 @@ export function FlaggedGrid({ records, cache, onSelect }: Props) {
     estimateSize: () => CELL_SIZE + LABEL_HEIGHT + GAP,
     overscan: 4,
   });
+
+  useEffect(() => {
+    if (activeIndex == null || columns === 0) return;
+    const rowIndex = Math.floor(activeIndex / columns);
+    virtualizer.scrollToIndex(rowIndex, { align: 'auto' });
+  }, [activeIndex, columns, virtualizer]);
 
   return (
     <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto">
@@ -103,6 +118,7 @@ export function FlaggedGrid({ records, cache, onSelect }: Props) {
                   key={flat.record.pathLower}
                   flat={flat}
                   cache={cache}
+                  isActive={activeIndex === startIndex + colIdx}
                   onSelect={() => onSelect(startIndex + colIdx)}
                 />
               ))}

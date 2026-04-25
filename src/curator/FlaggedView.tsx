@@ -157,6 +157,7 @@ export function FlaggedView({ isActive, cache, previewWidth, isResizing = false,
             <FlaggedGrid
               records={filtered}
               cache={cache}
+              activeIndex={selectedIndex}
               onSelect={setSelectedIndex}
             />
           )}

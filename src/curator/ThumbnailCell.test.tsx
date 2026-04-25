@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ThumbnailCell } from './ThumbnailCell';
 import type { DropboxFile } from '../dropbox/client';
@@ -60,5 +60,36 @@ describe('ThumbnailCell', () => {
     render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} onClick={vi.fn()} />);
     expect(screen.queryByTestId('flag-keep')).not.toBeInTheDocument();
     expect(screen.queryByTestId('flag-discard')).not.toBeInTheDocument();
+  });
+
+  it('should set aria-current="true" when isActive is true', () => {
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} isActive={true} onClick={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'photo.jpg' })).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('should omit aria-current when isActive is false', () => {
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} isActive={false} onClick={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'photo.jpg' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('should briefly show leaving state then clear it after 200 ms when isActive goes false', async () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} isActive={true} onClick={vi.fn()} />,
+    );
+
+    await act(async () => {
+      rerender(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} isActive={false} onClick={vi.fn()} />);
+    });
+
+    const container = screen.getByRole('button', { name: 'photo.jpg' }).querySelector('div');
+    expect(container).toHaveAttribute('data-leaving', 'true');
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(container).not.toHaveAttribute('data-leaving');
+    vi.useRealTimers();
   });
 });
