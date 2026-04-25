@@ -12,6 +12,7 @@ const FAKE_FILE: DropboxFile = {
   id: 'abc',
   size: 1024,
   server_modified: '2026-01-01T00:00:00Z',
+  client_modified: '2026-01-01T00:00:00Z',
 };
 
 describe('ThumbnailCell', () => {
