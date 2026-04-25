@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { wrapIndex, jumpRow } from './navigate';
 import { PreviewPanel } from './PreviewPanel';
+import type { NavigateDirection } from './PreviewPanel';
 import { FlaggedGrid } from './FlaggedGrid';
 import { useAllFlagged } from './useAllFlagged';
-import { wrapIndex } from './navigate';
 import type { ThumbnailCache } from './useThumbnailCache';
 import type { Flag } from './curation';
 import {
@@ -28,6 +29,7 @@ type Props = {
 export function FlaggedView({ isActive, cache, previewWidth, isResizing = false, onPreviewResize, onBeforeActivate }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [columns, setColumns] = useState(4);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { records, setFlag, clearAll, reload, flush, loading } = useAllFlagged();
@@ -54,9 +56,14 @@ export function FlaggedView({ isActive, cache, previewWidth, isResizing = false,
 
   const selectedFlat = selectedIndex !== null ? filtered[selectedIndex] : null;
 
-  function handleNavigate(delta: -1 | 1) {
+  function handleNavigate(direction: NavigateDirection) {
     if (selectedIndex === null || filtered.length === 0) return;
-    setSelectedIndex(wrapIndex(selectedIndex, delta, filtered.length));
+    switch (direction) {
+      case 'prev': setSelectedIndex(wrapIndex(selectedIndex, -1, filtered.length)); break;
+      case 'next': setSelectedIndex(wrapIndex(selectedIndex, 1, filtered.length)); break;
+      case 'up':   setSelectedIndex(jumpRow(selectedIndex, -1, filtered.length, columns)); break;
+      case 'down': setSelectedIndex(jumpRow(selectedIndex, 1, filtered.length, columns)); break;
+    }
   }
 
   function handleFlag(value: Flag | undefined) {
@@ -159,6 +166,7 @@ export function FlaggedView({ isActive, cache, previewWidth, isResizing = false,
               cache={cache}
               activeIndex={selectedIndex}
               onSelect={setSelectedIndex}
+              onColumnsChange={setColumns}
             />
           )}
         </div>

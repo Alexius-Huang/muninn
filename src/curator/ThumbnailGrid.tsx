@@ -65,6 +65,7 @@ type Props = {
   activeIndex?: number | null;
   onSelect: (index: number) => void;
   onClearAll?: () => void;
+  onColumnsChange?: (columns: number) => void;
 };
 
 export function sortFiles(entries: DropboxEntry[]): DropboxFile[] {
@@ -73,7 +74,7 @@ export function sortFiles(entries: DropboxEntry[]): DropboxFile[] {
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
-export function ThumbnailGrid({ path, entries, cache, flags, activeIndex, onSelect, onClearAll }: Props) {
+export function ThumbnailGrid({ path, entries, cache, flags, activeIndex, onSelect, onClearAll, onColumnsChange }: Props) {
   const files = sortFiles(entries);
   const displayPath = path === '' ? '/' : path;
   const flagCount = Object.keys(flags).length;
@@ -87,13 +88,17 @@ export function ThumbnailGrid({ path, entries, cache, flags, activeIndex, onSele
     if (!el) return;
     const compute = () => {
       const w = el.clientWidth;
-      if (w > 0) setColumns(Math.max(2, Math.floor((w - 32) / (CELL_SIZE + GAP))));
+      if (w > 0) {
+        const next = Math.max(2, Math.floor((w - 32) / (CELL_SIZE + GAP)));
+        setColumns(next);
+        onColumnsChange?.(next);
+      }
     };
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [onColumnsChange]);
 
   const rowCount = Math.ceil(files.length / columns);
   const gridWidth = columns * CELL_SIZE + (columns - 1) * GAP;

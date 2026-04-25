@@ -96,21 +96,21 @@ describe('PreviewPanel', () => {
     },
   );
 
-  it('should call onNavigate(-1) when ArrowLeft is pressed', async () => {
-    const user = userEvent.setup();
-    const onNavigate = vi.fn();
-    render(<PreviewPanel {...defaultProps({ onNavigate })} />);
-    await user.keyboard('{ArrowLeft}');
-    expect(onNavigate).toHaveBeenCalledWith(-1);
-  });
-
-  it('should call onNavigate(1) when ArrowRight is pressed', async () => {
-    const user = userEvent.setup();
-    const onNavigate = vi.fn();
-    render(<PreviewPanel {...defaultProps({ onNavigate })} />);
-    await user.keyboard('{ArrowRight}');
-    expect(onNavigate).toHaveBeenCalledWith(1);
-  });
+  it.each([
+    ['{ArrowLeft}',  'prev'],
+    ['{ArrowRight}', 'next'],
+    ['{ArrowUp}',    'up'],
+    ['{ArrowDown}',  'down'],
+  ] as [string, 'prev' | 'next' | 'up' | 'down'][])(
+    'should call onNavigate(%s) when %s is pressed',
+    async (key, direction) => {
+      const user = userEvent.setup();
+      const onNavigate = vi.fn();
+      render(<PreviewPanel {...defaultProps({ onNavigate })} />);
+      await user.keyboard(key);
+      expect(onNavigate).toHaveBeenCalledWith(direction);
+    },
+  );
 
   it('should render the Keep button as active when flag is keep', () => {
     render(<PreviewPanel {...defaultProps({ flag: 'keep' })} />);

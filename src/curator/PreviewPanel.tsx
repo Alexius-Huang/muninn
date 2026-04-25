@@ -9,6 +9,8 @@ type PreviewState =
   | { tag: 'success'; dataUrl: string }
   | { tag: 'error' };
 
+export type NavigateDirection = 'prev' | 'next' | 'up' | 'down';
+
 type Props = {
   file: DropboxFile;
   index: number;
@@ -18,7 +20,7 @@ type Props = {
   width: number;
   isResizing?: boolean;
   onClose: () => void;
-  onNavigate: (delta: -1 | 1) => void;
+  onNavigate: (direction: NavigateDirection) => void;
   onFlag: (value: Flag | undefined) => void;
 };
 
@@ -70,11 +72,19 @@ export function PreviewPanel({
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          onNavigate(-1);
+          onNavigate('prev');
           break;
         case 'ArrowRight':
           e.preventDefault();
-          onNavigate(1);
+          onNavigate('next');
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          onNavigate('up');
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          onNavigate('down');
           break;
         case 'Escape':
           onClose();
@@ -162,14 +172,14 @@ export function PreviewPanel({
       {/* navigation */}
       <div className="shrink-0 flex items-center justify-between px-3 pb-3">
         <button
-          onClick={() => onNavigate(-1)}
+          onClick={() => onNavigate('prev')}
           aria-label="Previous photo"
           className="flex items-center gap-1 px-2 py-1 rounded text-nord-4 hover:text-nord-6 hover:bg-nord-3 transition-colors text-sm"
         >
           <ChevronLeft size={14} /> Prev
         </button>
         <button
-          onClick={() => onNavigate(1)}
+          onClick={() => onNavigate('next')}
           aria-label="Next photo"
           className="flex items-center gap-1 px-2 py-1 rounded text-nord-4 hover:text-nord-6 hover:bg-nord-3 transition-colors text-sm"
         >

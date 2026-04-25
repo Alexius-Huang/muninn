@@ -53,9 +53,10 @@ type Props = {
   cache: ThumbnailCache;
   activeIndex?: number | null;
   onSelect: (index: number) => void;
+  onColumnsChange?: (columns: number) => void;
 };
 
-export function FlaggedGrid({ records, cache, activeIndex, onSelect }: Props) {
+export function FlaggedGrid({ records, cache, activeIndex, onSelect, onColumnsChange }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(4);
 
@@ -64,13 +65,17 @@ export function FlaggedGrid({ records, cache, activeIndex, onSelect }: Props) {
     if (!el) return;
     const compute = () => {
       const w = el.clientWidth;
-      if (w > 0) setColumns(Math.max(2, Math.floor((w - 32) / (CELL_SIZE + GAP))));
+      if (w > 0) {
+        const next = Math.max(2, Math.floor((w - 32) / (CELL_SIZE + GAP)));
+        setColumns(next);
+        onColumnsChange?.(next);
+      }
     };
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [onColumnsChange]);
 
   const rowCount = Math.ceil(records.length / columns);
   const gridWidth = columns * CELL_SIZE + (columns - 1) * GAP;

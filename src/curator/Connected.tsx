@@ -7,7 +7,8 @@ import { PreviewPanel } from './PreviewPanel';
 import { FlaggedView } from './FlaggedView';
 import { useThumbnailCache } from './useThumbnailCache';
 import { useCurationState } from './useCurationState';
-import { wrapIndex } from './navigate';
+import { wrapIndex, jumpRow } from './navigate';
+import type { NavigateDirection } from './PreviewPanel';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shadcn/tabs';
 
 type Props = {
@@ -34,6 +35,7 @@ export function Connected({ account, onDisconnect }: Props) {
   const [tab, setTab] = useState<'browse' | 'flagged'>('browse');
   const [active, setActive] = useState<Active | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [columns, setColumns] = useState(4);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [previewWidth, setPreviewWidth] = useState(480);
   const [isDraggingPreview, setIsDraggingPreview] = useState(false);
@@ -102,9 +104,14 @@ export function Connected({ account, onDisconnect }: Props) {
     setSelectedIndex(null);
   }
 
-  function handleNavigate(delta: -1 | 1) {
+  function handleNavigate(direction: NavigateDirection) {
     if (selectedIndex === null || files.length === 0) return;
-    setSelectedIndex(wrapIndex(selectedIndex, delta, files.length));
+    switch (direction) {
+      case 'prev': setSelectedIndex(wrapIndex(selectedIndex, -1, files.length)); break;
+      case 'next': setSelectedIndex(wrapIndex(selectedIndex, 1, files.length)); break;
+      case 'up':   setSelectedIndex(jumpRow(selectedIndex, -1, files.length, columns)); break;
+      case 'down': setSelectedIndex(jumpRow(selectedIndex, 1, files.length, columns)); break;
+    }
   }
 
   const selectedFile = selectedIndex !== null ? files[selectedIndex] : null;
@@ -210,6 +217,7 @@ export function Connected({ account, onDisconnect }: Props) {
                   activeIndex={selectedIndex}
                   onSelect={setSelectedIndex}
                   onClearAll={clearAll}
+                  onColumnsChange={setColumns}
                 />
               )}
             </div>
