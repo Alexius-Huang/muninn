@@ -108,9 +108,23 @@ describe('FolderTree', () => {
     expect(mockListFolderAll).toHaveBeenCalledTimes(callCountAfterExpand);
   });
 
-  it('should reveal an "Open" button on hover and call onOpen with cached entries when clicked', async () => {
+  it('should open gallery directly on first click for a leaf folder (no subfolders)', async () => {
     const user = userEvent.setup();
     const photosChildren = [makeFile('a.jpg', '/Photos/a.jpg')];
+    mockListFolderAll
+      .mockResolvedValueOnce([makeFolder('Photos', '/Photos')])
+      .mockResolvedValueOnce(photosChildren);
+    render(<FolderTree activePath={null} onOpen={onOpen} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Expand Photos' })).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Expand Photos' }));
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith('/Photos', photosChildren));
+    expect(mockListFolderAll).toHaveBeenCalledTimes(2); // root + leaf fetch
+  });
+
+  it('should reveal an "Open" button on hover and call onOpen with cached entries when clicked on a non-leaf folder', async () => {
+    const user = userEvent.setup();
+    const photosChildren = [makeFolder('Lyon', '/Photos/Lyon'), makeFile('a.jpg', '/Photos/a.jpg')];
     mockListFolderAll
       .mockResolvedValueOnce([makeFolder('Photos', '/Photos')])
       .mockResolvedValueOnce(photosChildren);
