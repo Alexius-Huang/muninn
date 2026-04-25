@@ -125,23 +125,23 @@ export function Connected({ account, onDisconnect }: Props) {
       }}
       className="h-full bg-nord-0 gap-0"
     >
-      <header className="flex items-center justify-between px-6 py-3 bg-nord-1 border-b border-nord-3 shrink-0">
-        <div>
+      <header className="flex items-stretch justify-between px-6 h-12 bg-nord-1 border-b border-nord-3 shrink-0">
+        <div className="flex items-center">
           <span className="text-nord-6 font-medium text-sm">{account.name.display_name}</span>
           {account.email && (
             <span className="text-nord-4 text-sm ml-2">{account.email}</span>
           )}
         </div>
-        <TabsList className="bg-transparent gap-4 p-0 h-auto border-b border-nord-3 rounded-none">
+        <TabsList className="h-full! bg-transparent! gap-1 p-0! rounded-none">
           <TabsTrigger
             value="browse"
-            className="rounded-none border-b-2 border-transparent px-2 py-1.5 text-nord-4 data-[state=active]:border-nord-8 data-[state=active]:text-nord-6 data-[state=active]:bg-transparent data-[state=active]:shadow-none after:hidden"
+            className="h-full! items-center! rounded-none border-0! border-b-2! border-transparent px-4 text-sm font-medium shadow-none! bg-transparent! text-nord-4! hover:text-nord-6! hover:bg-nord-2! focus-visible:ring-0! focus-visible:outline-hidden after:hidden data-[state=active]:border-nord-8! data-[state=active]:text-nord-6! data-[state=active]:bg-transparent! data-[state=active]:hover:bg-nord-2! transition-colors -mb-px"
           >
             Browse
           </TabsTrigger>
           <TabsTrigger
             value="flagged"
-            className="rounded-none border-b-2 border-transparent px-2 py-1.5 text-nord-4 data-[state=active]:border-nord-8 data-[state=active]:text-nord-6 data-[state=active]:bg-transparent data-[state=active]:shadow-none after:hidden"
+            className="h-full! items-center! rounded-none border-0! border-b-2! border-transparent px-4 text-sm font-medium shadow-none! bg-transparent! text-nord-4! hover:text-nord-6! hover:bg-nord-2! focus-visible:ring-0! focus-visible:outline-hidden after:hidden data-[state=active]:border-nord-8! data-[state=active]:text-nord-6! data-[state=active]:bg-transparent! data-[state=active]:hover:bg-nord-2! transition-colors -mb-px"
           >
             Flagged
           </TabsTrigger>
@@ -163,12 +163,14 @@ export function Connected({ account, onDisconnect }: Props) {
             </button>
           </div>
         ) : (
-          <button
-            onClick={handleDisconnect}
-            className="px-4 py-1.5 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
-          >
-            Disconnect
-          </button>
+          <div className="flex items-center">
+            <button
+              onClick={handleDisconnect}
+              className="px-4 py-1.5 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
+            >
+              Disconnect
+            </button>
+          </div>
         )}
       </header>
 
