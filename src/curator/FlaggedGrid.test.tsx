@@ -28,6 +28,7 @@ function makeFlat(name: string, flag: 'keep' | 'discard'): FlatRecord {
   const pathLower = `/photos/lyon/${name.toLowerCase()}`;
   return {
     folderPath: '/Photos/Lyon',
+    key: pathLower,
     record: {
       pathLower,
       pathDisplay: `/Photos/Lyon/${name}`,

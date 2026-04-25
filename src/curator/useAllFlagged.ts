@@ -117,7 +117,7 @@ export function useAllFlagged(): AllFlaggedReturn {
   // Initial load on mount; flush pending writes on unmount
   useEffect(() => {
     void reload();
-    return flush;
+    return () => { void flush(); };
   }, [reload, flush]);
 
   return { records, setFlag, clearAll, reload, flush, loading };

@@ -58,10 +58,12 @@ export function PreviewPanel({
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       switch (e.key) {
+        case '1':
         case 'k':
         case 'K':
           onFlag(flag === 'keep' ? undefined : 'keep');
           break;
+        case '2':
         case 'd':
         case 'D':
           onFlag(flag === 'discard' ? undefined : 'discard');
@@ -131,7 +133,7 @@ export function PreviewPanel({
       <div className="shrink-0 flex items-center justify-center gap-3 px-4 py-3 border-t border-nord-3">
         <button
           onClick={() => onFlag(flag === 'keep' ? undefined : 'keep')}
-          aria-label="Keep (K)"
+          aria-label="Keep (1 or K)"
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
             flag === 'keep'
               ? 'bg-nord-14 text-nord-0'
@@ -140,10 +142,11 @@ export function PreviewPanel({
         >
           <CheckCircle size={14} />
           Keep
+          <kbd className="inline-flex items-center justify-center w-4 h-4 text-[10px] font-mono rounded border border-current opacity-50 leading-none ml-0.5">1</kbd>
         </button>
         <button
           onClick={() => onFlag(flag === 'discard' ? undefined : 'discard')}
-          aria-label="Discard (D)"
+          aria-label="Discard (2 or D)"
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
             flag === 'discard'
               ? 'bg-nord-11 text-nord-6'
@@ -152,6 +155,7 @@ export function PreviewPanel({
         >
           <XCircle size={14} />
           Discard
+          <kbd className="inline-flex items-center justify-center w-4 h-4 text-[10px] font-mono rounded border border-current opacity-50 leading-none ml-0.5">2</kbd>
         </button>
       </div>
 

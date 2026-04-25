@@ -27,6 +27,7 @@ function makeFile(name: string, path: string): DropboxEntry {
     id: `id-${name}`,
     size: 1024,
     server_modified: '2026-01-01T00:00:00Z',
+    client_modified: '2026-01-01T00:00:00Z',
   };
 }
 

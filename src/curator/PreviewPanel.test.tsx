@@ -21,6 +21,7 @@ const FAKE_FILE: DropboxFile = {
   id: 'abc',
   size: 1024,
   server_modified: '2026-01-01T00:00:00Z',
+  client_modified: '2026-01-01T00:00:00Z',
 };
 
 const PREVIEW_URL = 'data:image/jpeg;base64,hires';
@@ -77,21 +78,23 @@ describe('PreviewPanel', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it("should call onFlag('keep') when K is pressed", async () => {
-    const user = userEvent.setup();
-    const onFlag = vi.fn();
-    render(<PreviewPanel {...defaultProps({ onFlag })} />);
-    await user.keyboard('k');
-    expect(onFlag).toHaveBeenCalledWith('keep');
-  });
-
-  it("should call onFlag('discard') when D is pressed", async () => {
-    const user = userEvent.setup();
-    const onFlag = vi.fn();
-    render(<PreviewPanel {...defaultProps({ onFlag })} />);
-    await user.keyboard('d');
-    expect(onFlag).toHaveBeenCalledWith('discard');
-  });
+  it.each([
+    ['k', 'keep'],
+    ['K', 'keep'],
+    ['1', 'keep'],
+    ['d', 'discard'],
+    ['D', 'discard'],
+    ['2', 'discard'],
+  ] as [string, 'keep' | 'discard'][])(
+    "should call onFlag('%s') → '%s' when key '%s' is pressed",
+    async (key, expected) => {
+      const user = userEvent.setup();
+      const onFlag = vi.fn();
+      render(<PreviewPanel {...defaultProps({ onFlag })} />);
+      await user.keyboard(key);
+      expect(onFlag).toHaveBeenCalledWith(expected);
+    },
+  );
 
   it('should call onNavigate(-1) when ArrowLeft is pressed', async () => {
     const user = userEvent.setup();
@@ -120,6 +123,20 @@ describe('PreviewPanel', () => {
     const discardBtn = screen.getByRole('button', { name: /discard/i });
     expect(discardBtn.className).toMatch(/bg-nord-11/);
   });
+
+  it.each([
+    [/keep/i, '1'],
+    [/discard/i, '2'],
+  ] as [RegExp, string][])(
+    "should display a <kbd> hint inside the '%s' button",
+    (buttonName, hint) => {
+      render(<PreviewPanel {...defaultProps()} />);
+      const btn = screen.getByRole('button', { name: buttonName });
+      const kbd = btn.querySelector('kbd');
+      expect(kbd).not.toBeNull();
+      expect(kbd?.textContent).toBe(hint);
+    },
+  );
 
   it('should render current index and total in the header', () => {
     render(<PreviewPanel {...defaultProps({ index: 1, total: 10 })} />);
