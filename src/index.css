@@ -72,7 +72,7 @@ html, body, #root {
   background-color: var(--color-nord-0);
 }
 
-/* nord-0 background fills the gap while dark tiles load */
-.muninn-map {
-  background: #2e3440;
+/* Match dialog bg (nord-1) so no white flash during tile load/zoom */
+.muninn-map.leaflet-container {
+  background: #3b4252;
 }
