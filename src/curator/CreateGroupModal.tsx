@@ -55,7 +55,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 min-w-0 overflow-hidden">
           <div className="flex flex-col gap-1">
             <label htmlFor="group-name" className="text-sm text-nord-4">
               Name
