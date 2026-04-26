@@ -17,6 +17,12 @@ vi.mock('@/components/NominatimSearch', () => ({
   ),
 }));
 
+vi.mock('@/components/LocationMapPreview', () => ({
+  LocationMapPreview: ({ lat, lng }: { lat: number; lng: number }) => (
+    <div data-testid="location-map-preview" data-lat={lat} data-lng={lng} />
+  ),
+}));
+
 import { CreateGroupModal } from './CreateGroupModal';
 
 beforeAll(() => {
@@ -105,5 +111,18 @@ describe('CreateGroupModal', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onSubmit).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('should show the map preview after a location is picked and hide it after Change', async () => {
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} />);
+    expect(screen.queryByTestId('location-map-preview')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    const preview = screen.getByTestId('location-map-preview');
+    expect(preview).toBeInTheDocument();
+    expect(preview).toHaveAttribute('data-lat', '48.858');
+    expect(preview).toHaveAttribute('data-lng', '2.294');
+    await user.click(screen.getByRole('button', { name: 'Change' }));
+    expect(screen.queryByTestId('location-map-preview')).not.toBeInTheDocument();
   });
 });
