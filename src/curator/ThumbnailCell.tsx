@@ -85,7 +85,7 @@ export function ThumbnailCell({ file, state, flag, groupId, isActive = false, re
           <div
             data-testid="grouped"
             aria-label="grouped"
-            className="absolute top-1 right-1 rounded-full bg-nord-0/70 backdrop-blur-sm p-1 text-nord-9 pointer-events-none"
+            className="absolute top-[2px] right-[2px] rounded-full bg-nord-5/90 backdrop-blur-sm p-1 text-nord-1 pointer-events-none"
           >
             <MapPin className="h-3.5 w-3.5" />
           </div>

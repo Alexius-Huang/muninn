@@ -29,7 +29,7 @@ vi.mock('../dropbox/client', async (importOriginal) => {
 });
 
 vi.mock('./useCurationState', () => ({
-  useCurationState: vi.fn(() => ({ flags: {}, setFlag: mockSetFlag, flush: mockFlushBrowse, reload: mockReloadBrowse })),
+  useCurationState: vi.fn(() => ({ flags: {}, groupIds: {}, setFlag: mockSetFlag, removeFromGroup: vi.fn(), flush: mockFlushBrowse, reload: mockReloadBrowse })),
 }));
 
 vi.mock('./useAllFlagged', () => ({
@@ -39,6 +39,11 @@ vi.mock('./useAllFlagged', () => ({
 vi.mock('./curation', () => ({
   listCuration: (...args: unknown[]) => mockListCuration(...args),
   writeCuration: (...args: unknown[]) => mockWriteCuration(...args),
+}));
+
+vi.mock('./groups', () => ({
+  readGroups: vi.fn().mockResolvedValue([]),
+  createGroupAndPersist: vi.fn().mockResolvedValue({ id: 'g1', name: 'Test', lat: 0, lng: 0, photoIds: [] }),
 }));
 
 beforeAll(() => {
