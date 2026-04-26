@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,16 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
   const [name, setName] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<NominatimLocation | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'pending' | 'loading' | 'error'>('idle');
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  const handleLocationStatusChange = useCallback(
+    (s: 'idle' | 'pending' | 'loading' | 'error', errMsg?: string) => {
+      setLocationStatus(s);
+      setLocationError(errMsg ?? null);
+    },
+    [],
+  );
 
   function handleOpenChange(next: boolean) {
     if (submitting) return;
@@ -36,6 +46,8 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
       onOpenChange(false);
       setName('');
       setSelectedLocation(null);
+      setLocationStatus('idle');
+      setLocationError(null);
     } catch {
       // keep modal open for retry
     } finally {
@@ -71,13 +83,27 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-sm text-nord-4">Location</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm text-nord-4">Location</span>
+              {selectedLocation ? (
+                <svg className="h-3.5 w-3.5 text-nord-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 6L9 17l-5-5" />
+                </svg>
+              ) : (locationStatus === 'pending' || locationStatus === 'loading') ? (
+                <>
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border border-nord-4 border-t-transparent" />
+                  <span className="text-xs text-nord-4">Fetching…</span>
+                </>
+              ) : locationStatus === 'error' ? (
+                <span className="text-xs text-nord-11">{locationError ?? 'Search failed'}</span>
+              ) : null}
+            </div>
             {selectedLocation ? (
               <div className="flex items-center justify-between rounded border border-nord-3 bg-nord-0 px-3 py-2">
                 <span className="text-sm text-nord-6 truncate">{selectedLocation.displayName}</span>
                 <button
                   type="button"
-                  onClick={() => setSelectedLocation(null)}
+                  onClick={() => { setSelectedLocation(null); setLocationStatus('idle'); setLocationError(null); }}
                   className="ml-2 shrink-0 text-xs text-nord-8 hover:text-nord-6"
                 >
                   Change
@@ -88,6 +114,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
                 onSelect={setSelectedLocation}
                 email={email}
                 placeholder="Search for a place…"
+                onStatusChange={handleLocationStatusChange}
               />
             )}
           </div>

@@ -40,25 +40,28 @@ type Props = {
   onSelect: (location: NominatimLocation) => void;
   email: string;
   placeholder?: string;
+  onStatusChange?: (status: 'idle' | 'pending' | 'loading' | 'error', errorMessage?: string) => void;
 };
 
-export function NominatimSearch({ onSelect, email, placeholder = 'Search for a place…' }: Props) {
+export function NominatimSearch({ onSelect, email, placeholder = 'Search for a place…', onStatusChange }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<NominatimLocation[]>([]);
   const [status, setStatus] = useState<'idle' | 'pending' | 'loading' | 'error'>('idle');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const lastFetchRef = useRef<number>(0);
   const reqIdRef = useRef<number>(0);
+  const onStatusChangeRef = useRef(onStatusChange);
+  onStatusChangeRef.current = onStatusChange;
 
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
       setStatus('idle');
-      setErrorMsg(null);
+      onStatusChangeRef.current?.('idle');
       return;
     }
 
     setStatus('pending');
+    onStatusChangeRef.current?.('pending');
 
     const elapsed = Date.now() - lastFetchRef.current;
     const throttleDelay = Math.max(0, THROTTLE_MS - elapsed);
@@ -68,17 +71,19 @@ export function NominatimSearch({ onSelect, email, placeholder = 'Search for a p
     const timerId = setTimeout(async () => {
       lastFetchRef.current = Date.now();
       setStatus('loading');
-      setErrorMsg(null);
+      onStatusChangeRef.current?.('loading');
 
       try {
         const data = await searchNominatim(query, email);
         if (reqId !== reqIdRef.current) return;
         setResults(data);
         setStatus('idle');
+        onStatusChangeRef.current?.('idle');
       } catch (e) {
         if (reqId !== reqIdRef.current) return;
-        setErrorMsg((e as Error).message ?? 'Search failed');
+        const msg = (e as Error).message ?? 'Search failed';
         setStatus('error');
+        onStatusChangeRef.current?.('error', msg);
       }
     }, totalDelay);
 
@@ -101,10 +106,6 @@ export function NominatimSearch({ onSelect, email, placeholder = 'Search for a p
         className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       />
 
-      {status === 'loading' && (
-        <p className="px-1 py-2 text-xs text-zinc-400">Searching…</p>
-      )}
-
       {status === 'idle' && results.length > 0 && (
         <ul className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded border border-zinc-700 bg-zinc-900 shadow-lg">
           {results.map((r) => (
@@ -120,14 +121,6 @@ export function NominatimSearch({ onSelect, email, placeholder = 'Search for a p
             </li>
           ))}
         </ul>
-      )}
-
-      {status === 'idle' && results.length === 0 && query.trim() && (
-        <p className="px-1 py-2 text-xs text-zinc-400">No results found.</p>
-      )}
-
-      {status === 'error' && (
-        <p role="alert" className="px-1 py-2 text-xs text-red-400">{errorMsg}</p>
       )}
     </div>
   );
