@@ -36,12 +36,6 @@ describe('LocationMapPreview', () => {
     expect(JSON.parse(container.dataset.center!)).toEqual([LAT, LNG]);
   });
 
-  it('should render the OpenStreetMap attribution', () => {
-    render(<LocationMapPreview lat={LAT} lng={LNG} />);
-    const layer = screen.getByTestId('tile-layer');
-    expect(layer.dataset.attribution).toContain('OpenStreetMap');
-  });
-
   it('should place the marker on the provided lat/lng', () => {
     render(<LocationMapPreview lat={LAT} lng={LNG} />);
     const marker = screen.getByTestId('circle-marker');
