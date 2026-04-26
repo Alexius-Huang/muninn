@@ -71,3 +71,8 @@ html, body, #root {
   height: 100%;
   background-color: var(--color-nord-0);
 }
+
+/* Match dialog bg (nord-1) so no white flash during tile load/zoom */
+.muninn-map.leaflet-container {
+  background: #3b4252;
+}

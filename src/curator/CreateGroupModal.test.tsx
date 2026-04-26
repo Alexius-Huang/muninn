@@ -17,6 +17,15 @@ vi.mock('@/components/NominatimSearch', () => ({
   ),
 }));
 
+vi.mock('@/components/LocationMapPreview', () => ({
+  LocationMapPreview: ({ lat, lng }: { lat: number | null; lng: number | null }) =>
+    lat !== null && lng !== null ? (
+      <div data-testid="location-map-preview" data-lat={lat} data-lng={lng} />
+    ) : (
+      <div data-testid="location-map-placeholder">Select a location to preview on map</div>
+    ),
+}));
+
 import { CreateGroupModal } from './CreateGroupModal';
 
 beforeAll(() => {
@@ -105,5 +114,21 @@ describe('CreateGroupModal', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onSubmit).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('should show placeholder initially, map preview after location is picked, and placeholder again after Change', async () => {
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} />);
+    expect(screen.getByTestId('location-map-placeholder')).toBeInTheDocument();
+    expect(screen.queryByTestId('location-map-preview')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    const preview = screen.getByTestId('location-map-preview');
+    expect(preview).toBeInTheDocument();
+    expect(preview).toHaveAttribute('data-lat', '48.858');
+    expect(preview).toHaveAttribute('data-lng', '2.294');
+    expect(screen.queryByTestId('location-map-placeholder')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Change' }));
+    expect(screen.queryByTestId('location-map-preview')).not.toBeInTheDocument();
+    expect(screen.getByTestId('location-map-placeholder')).toBeInTheDocument();
   });
 });

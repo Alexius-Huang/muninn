@@ -9,6 +9,7 @@ import {
 } from '@/components/shadcn/dialog';
 import { NominatimSearch } from '@/components/NominatimSearch';
 import type { NominatimLocation } from '@/components/NominatimSearch';
+import { LocationMapPreview } from '@/components/LocationMapPreview';
 
 type Props = {
   open: boolean;
@@ -59,7 +60,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent className="min-w-[720px] max-w-[820px]">
         <DialogHeader>
           <DialogTitle>Create group</DialogTitle>
           <DialogDescription>
@@ -118,6 +119,12 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
               />
             )}
           </div>
+
+          <LocationMapPreview
+            key={selectedLocation?.placeId ?? 'empty'}
+            lat={selectedLocation?.lat ?? null}
+            lng={selectedLocation?.lng ?? null}
+          />
         </div>
 
         <DialogFooter>
