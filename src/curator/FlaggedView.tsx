@@ -108,7 +108,7 @@ export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cac
         {filter === 'keep' && filtered.length > 0 && (
           <button
             onClick={() => setCreateGroupOpen(true)}
-            className="px-3 py-1 rounded-lg bg-nord-8 text-white hover:bg-nord-9 transition-colors text-sm"
+            className="px-3 py-1 rounded-lg bg-nord-9 text-white hover:bg-nord-10 transition-colors text-sm"
           >
             Create Group
           </button>
