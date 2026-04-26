@@ -79,5 +79,5 @@ html, body, #root {
 .muninn-map .leaflet-tile-pane {
   /* hue-rotate shifts warm Voyager land tones toward nord-14 green;
      saturate + brightness mute and darken so sea reads heavier than land */
-  filter: hue-rotate(50deg) saturate(0.75) brightness(0.88);
+  filter: hue-rotate(50deg) saturate(1.1) brightness(0.5);
 }
