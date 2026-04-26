@@ -54,13 +54,13 @@ afterEach(() => {
 
 describe('NominatimSearch', () => {
   it('renders a text input', () => {
-    render(<NominatimSearch onSelect={vi.fn()} />);
+    render(<NominatimSearch onSelect={vi.fn()} email="test@example.com" />);
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
   it('does not call fetch on mount with empty input', () => {
     globalThis.fetch = vi.fn();
-    render(<NominatimSearch onSelect={vi.fn()} />);
+    render(<NominatimSearch onSelect={vi.fn()} email="test@example.com" />);
     act(() => { vi.runAllTimers(); });
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -69,7 +69,7 @@ describe('NominatimSearch', () => {
     'does not fetch for whitespace-only query %j',
     (query) => {
       globalThis.fetch = vi.fn();
-      render(<NominatimSearch onSelect={vi.fn()} />);
+      render(<NominatimSearch onSelect={vi.fn()} email="test@example.com" />);
       if (query) typeInto(screen.getByRole('textbox'), query);
       act(() => { vi.runAllTimers(); });
       expect(fetch).not.toHaveBeenCalled();
@@ -78,7 +78,7 @@ describe('NominatimSearch', () => {
 
   it('shows results after debounce fires', async () => {
     mockFetchSuccess([PARIS]);
-    render(<NominatimSearch onSelect={vi.fn()} />);
+    render(<NominatimSearch onSelect={vi.fn()} email="test@example.com" />);
     typeInto(screen.getByRole('textbox'), 'Paris');
     await act(async () => { await vi.runAllTimersAsync(); });
     expect(screen.getByText('Paris')).toBeInTheDocument();
@@ -92,7 +92,7 @@ describe('NominatimSearch', () => {
       json: () => new Promise((resolve) => { resolveJson = resolve; }),
     } as unknown as Response);
 
-    render(<NominatimSearch onSelect={vi.fn()} />);
+    render(<NominatimSearch onSelect={vi.fn()} email="test@example.com" />);
     typeInto(screen.getByRole('textbox'), 'Lyon');
     // Fire the debounce — setStatus('loading') is called synchronously before
     // the first await in the callback, so act flushes it.
@@ -105,10 +105,10 @@ describe('NominatimSearch', () => {
   it('calls onSelect with correct shape and clears input on result click', async () => {
     mockFetchSuccess([PARIS]);
     const onSelect = vi.fn();
-    render(<NominatimSearch onSelect={onSelect} />);
+    render(<NominatimSearch onSelect={onSelect} email="test@example.com" />);
     typeInto(screen.getByRole('textbox'), 'Paris');
     await act(async () => { await vi.runAllTimersAsync(); });
-    act(() => { fireEvent.click(screen.getByRole('button', { name: /Paris/ })); });
+    fireEvent.click(screen.getByRole('button', { name: /Paris/ }));
     expect(onSelect).toHaveBeenCalledOnce();
     expect(onSelect).toHaveBeenCalledWith({
       name: 'Paris',
@@ -123,7 +123,7 @@ describe('NominatimSearch', () => {
 
   it('shows empty state when Nominatim returns no results', async () => {
     mockFetchSuccess([]);
-    render(<NominatimSearch onSelect={vi.fn()} />);
+    render(<NominatimSearch onSelect={vi.fn()} email="test@example.com" />);
     typeInto(screen.getByRole('textbox'), 'zzzzz');
     await act(async () => { await vi.runAllTimersAsync(); });
     expect(screen.getByText('No results found.')).toBeInTheDocument();
@@ -139,9 +139,9 @@ describe('NominatimSearch', () => {
     } else {
       mockFetchError(status);
     }
-    render(<NominatimSearch onSelect={vi.fn()} />);
+    render(<NominatimSearch onSelect={vi.fn()} email="test@example.com" />);
     typeInto(screen.getByRole('textbox'), 'Paris');
     await act(async () => { await vi.runAllTimersAsync(); });
-    expect(document.querySelector('.text-red-400')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 });

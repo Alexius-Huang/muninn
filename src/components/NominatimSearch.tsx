@@ -16,11 +16,13 @@ type NominatimApiResult = {
   lon: string;
 };
 
-export async function searchNominatim(query: string): Promise<NominatimLocation[]> {
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10`;
-  const resp = await fetch(url, {
-    headers: { 'User-Agent': 'Muninn/1.0' },
-  });
+const DEBOUNCE_MS = 400;
+const THROTTLE_MS = 1000;
+
+// User-Agent is a forbidden request header in browsers — identify via email param per Nominatim policy.
+export async function searchNominatim(query: string, email: string): Promise<NominatimLocation[]> {
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&email=${encodeURIComponent(email)}`;
+  const resp = await fetch(url);
   if (!resp.ok) {
     throw new Error(`Nominatim returned ${resp.status}`);
   }
@@ -36,15 +38,17 @@ export async function searchNominatim(query: string): Promise<NominatimLocation[
 
 type Props = {
   onSelect: (location: NominatimLocation) => void;
+  email: string;
   placeholder?: string;
 };
 
-export function NominatimSearch({ onSelect, placeholder = 'Search for a place…' }: Props) {
+export function NominatimSearch({ onSelect, email, placeholder = 'Search for a place…' }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<NominatimLocation[]>([]);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'pending' | 'loading' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const lastFetchRef = useRef<number>(0);
+  const reqIdRef = useRef<number>(0);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -54,9 +58,12 @@ export function NominatimSearch({ onSelect, placeholder = 'Search for a place…
       return;
     }
 
+    setStatus('pending');
+
     const elapsed = Date.now() - lastFetchRef.current;
-    const throttleDelay = Math.max(0, 1000 - elapsed);
-    const totalDelay = 400 + throttleDelay;
+    const throttleDelay = Math.max(0, THROTTLE_MS - elapsed);
+    const totalDelay = DEBOUNCE_MS + throttleDelay;
+    const reqId = ++reqIdRef.current;
 
     const timerId = setTimeout(async () => {
       lastFetchRef.current = Date.now();
@@ -64,10 +71,12 @@ export function NominatimSearch({ onSelect, placeholder = 'Search for a place…
       setErrorMsg(null);
 
       try {
-        const data = await searchNominatim(query);
+        const data = await searchNominatim(query, email);
+        if (reqId !== reqIdRef.current) return;
         setResults(data);
         setStatus('idle');
       } catch (e) {
+        if (reqId !== reqIdRef.current) return;
         setErrorMsg((e as Error).message ?? 'Search failed');
         setStatus('error');
       }
@@ -118,7 +127,7 @@ export function NominatimSearch({ onSelect, placeholder = 'Search for a place…
       )}
 
       {status === 'error' && (
-        <p className="px-1 py-2 text-xs text-red-400">{errorMsg}</p>
+        <p role="alert" className="px-1 py-2 text-xs text-red-400">{errorMsg}</p>
       )}
     </div>
   );
