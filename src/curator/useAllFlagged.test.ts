@@ -6,10 +6,14 @@ import type { CurationFile } from './curation';
 const mockListCuration = vi.fn();
 const mockWriteCuration = vi.fn();
 
-vi.mock('./curation', () => ({
-  listCuration: (...args: unknown[]) => mockListCuration(...args),
-  writeCuration: (...args: unknown[]) => mockWriteCuration(...args),
-}));
+vi.mock('./curation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./curation')>();
+  return {
+    ...actual,
+    listCuration: (...args: unknown[]) => mockListCuration(...args),
+    writeCuration: (...args: unknown[]) => mockWriteCuration(...args),
+  };
+});
 
 import { useAllFlagged } from './useAllFlagged';
 
@@ -172,5 +176,70 @@ describe('useAllFlagged', () => {
     expect(mockWriteCuration).not.toHaveBeenCalled();
     unmount();
     expect(mockWriteCuration).toHaveBeenCalledOnce();
+  });
+
+  describe('assignGroupId', () => {
+    it('should clear flag and set groupId on each affected record', async () => {
+      mockListCuration.mockResolvedValue([
+        makeFile('/Photos/Lyon', [{ pathLower: '/photos/lyon/a.jpg', name: 'a.jpg', flag: 'keep' }]),
+      ]);
+      const { result } = renderHook(() => useAllFlagged());
+      await act(async () => {});
+      await act(async () => {
+        await result.current.assignGroupId([{ folderPath: '/Photos/Lyon', key: '/photos/lyon/a.jpg' }], 'g1');
+      });
+      const written = mockWriteCuration.mock.calls[0][0];
+      expect(written.records['/photos/lyon/a.jpg'].groupId).toBe('g1');
+      expect(written.records['/photos/lyon/a.jpg'].flag).toBeUndefined();
+    });
+
+    it('should remove transitioned records from records (hook surfaces only flag !== undefined)', async () => {
+      mockListCuration.mockResolvedValue([
+        makeFile('/Photos/Lyon', [{ pathLower: '/photos/lyon/a.jpg', name: 'a.jpg', flag: 'keep' }]),
+      ]);
+      const { result } = renderHook(() => useAllFlagged());
+      await act(async () => {});
+      await act(async () => {
+        await result.current.assignGroupId([{ folderPath: '/Photos/Lyon', key: '/photos/lyon/a.jpg' }], 'g1');
+      });
+      expect(result.current.records).toHaveLength(0);
+    });
+
+    it('should write each affected folder exactly once when photos span two folders', async () => {
+      mockListCuration.mockResolvedValue([
+        makeFile('/Photos/Lyon', [{ pathLower: '/photos/lyon/a.jpg', name: 'a.jpg', flag: 'keep' }]),
+        makeFile('/Photos/Paris', [{ pathLower: '/photos/paris/b.jpg', name: 'b.jpg', flag: 'keep' }]),
+      ]);
+      const { result } = renderHook(() => useAllFlagged());
+      await act(async () => {});
+      await act(async () => {
+        await result.current.assignGroupId([
+          { folderPath: '/Photos/Lyon', key: '/photos/lyon/a.jpg' },
+          { folderPath: '/Photos/Paris', key: '/photos/paris/b.jpg' },
+        ], 'g1');
+      });
+      expect(mockWriteCuration).toHaveBeenCalledTimes(2);
+      const calledFolders = new Set(mockWriteCuration.mock.calls.map((c) => c[0].folderPath));
+      expect(calledFolders).toEqual(new Set(['/Photos/Lyon', '/Photos/Paris']));
+    });
+
+    it('should cancel pending debounced writes for affected folders before the immediate write', async () => {
+      mockListCuration.mockResolvedValue([
+        makeFile('/Photos/Lyon', [{ pathLower: '/photos/lyon/a.jpg', name: 'a.jpg', flag: 'keep' }]),
+      ]);
+      const { result } = renderHook(() => useAllFlagged());
+      await act(async () => {});
+      act(() => {
+        result.current.setFlag('/Photos/Lyon', '/photos/lyon/a.jpg', 'discard');
+      });
+      expect(mockWriteCuration).not.toHaveBeenCalled();
+      await act(async () => {
+        await result.current.assignGroupId([{ folderPath: '/Photos/Lyon', key: '/photos/lyon/a.jpg' }], 'g1');
+      });
+      await act(async () => { vi.advanceTimersByTime(250); });
+      expect(mockWriteCuration).toHaveBeenCalledTimes(1);
+      const written = mockWriteCuration.mock.calls[0][0];
+      expect(written.records['/photos/lyon/a.jpg'].groupId).toBe('g1');
+    });
   });
 });

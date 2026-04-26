@@ -162,6 +162,17 @@ export function applyGroupId(
   return next;
 }
 
+export function transitionToGroup(
+  records: Record<string, CurationRecord>,
+  key: string,
+  groupId: string,
+): Record<string, CurationRecord> {
+  const existing = records[key];
+  if (!existing) return records;
+  const { flag: _flag, ...rest } = existing;
+  return { ...records, [key]: { ...rest, groupId } };
+}
+
 export function clearGroupRefs(
   records: Record<string, CurationRecord>,
   groupId: string,

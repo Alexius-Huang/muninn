@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { listCuration, writeCuration, type CurationFile, type CurationRecord, type Flag } from './curation';
+import { listCuration, writeCuration, transitionToGroup, type CurationFile, type CurationRecord, type Flag } from './curation';
 
 export type FlatRecord = {
   folderPath: string;
@@ -11,6 +11,7 @@ export type AllFlaggedReturn = {
   records: FlatRecord[];
   setFlag: (folderPath: string, recordKey: string, value: Flag | undefined) => void;
   clearAll: () => void;
+  assignGroupId: (photos: { folderPath: string; key: string }[], groupId: string) => Promise<void>;
   reload: () => Promise<void>;
   flush: () => Promise<void>;
   loading: boolean;
@@ -114,11 +115,42 @@ export function useAllFlagged(): AllFlaggedReturn {
     timersRef.current.set(folderPath, timer);
   }, []);
 
+  const assignGroupId = useCallback(async (photos: { folderPath: string; key: string }[], groupId: string): Promise<void> => {
+    const byFolder = new Map<string, string[]>();
+    for (const { folderPath, key } of photos) {
+      const keys = byFolder.get(folderPath) ?? [];
+      keys.push(key);
+      byFolder.set(folderPath, keys);
+    }
+
+    const writes: Promise<void>[] = [];
+    for (const [folderPath, keys] of byFolder) {
+      const existing = timersRef.current.get(folderPath);
+      if (existing !== undefined) {
+        clearTimeout(existing);
+        timersRef.current.delete(folderPath);
+      }
+      let recs = filesRef.current.get(folderPath) ?? {};
+      for (const key of keys) {
+        recs = transitionToGroup(recs, key, groupId);
+      }
+      filesRef.current.set(folderPath, recs);
+      writes.push(writeCuration({ folderPath, records: recs }));
+    }
+    await Promise.all(writes);
+
+    const allFiles: CurationFile[] = [];
+    for (const [fp, recs] of filesRef.current) {
+      allFiles.push({ folderPath: fp, records: recs });
+    }
+    setRecords(flatten(allFiles));
+  }, []);
+
   // Initial load on mount; flush pending writes on unmount
   useEffect(() => {
     void reload();
     return () => { void flush(); };
   }, [reload, flush]);
 
-  return { records, setFlag, clearAll, reload, flush, loading };
+  return { records, setFlag, clearAll, assignGroupId, reload, flush, loading };
 }

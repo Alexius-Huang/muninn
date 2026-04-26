@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockInvoke = vi.fn();
 vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => mockInvoke(...args) }));
 
-import { readCuration, writeCuration, listCuration, migrateLegacyCurationFile, migrateToIdKeys, applyFlag, applyGroupId, clearGroupRefs } from './curation';
+import { readCuration, writeCuration, listCuration, migrateLegacyCurationFile, migrateToIdKeys, applyFlag, applyGroupId, transitionToGroup, clearGroupRefs } from './curation';
 import type { CurationFile, CurationRecord } from './curation';
 import type { DropboxFile } from '../dropbox/client';
 
@@ -311,6 +311,47 @@ describe('applyGroupId', () => {
     const result = applyGroupId({ 'id:a': existing }, file, undefined);
     expect(result['id:a'].flag).toBe('keep');
     expect(result['id:a'].groupId).toBeUndefined();
+  });
+});
+
+describe('transitionToGroup', () => {
+  const base: CurationRecord = {
+    photoId: 'id:a',
+    pathLower: '/photos/lyon/a.jpg',
+    pathDisplay: '/Photos/Lyon/a.jpg',
+    name: 'a.jpg',
+    flag: 'keep',
+    capturedAt: '2024-06-01T00:00:00Z',
+  };
+
+  it('should set groupId and clear flag for an existing flagged record', () => {
+    const result = transitionToGroup({ 'id:a': structuredClone(base) }, 'id:a', 'g1');
+    expect(result['id:a'].groupId).toBe('g1');
+    expect(result['id:a'].flag).toBeUndefined();
+  });
+
+  it('should preserve photoId, pathLower, pathDisplay, name, capturedAt', () => {
+    const result = transitionToGroup({ 'id:a': structuredClone(base) }, 'id:a', 'g1');
+    const r = result['id:a'];
+    expect(r.photoId).toBe('id:a');
+    expect(r.pathLower).toBe('/photos/lyon/a.jpg');
+    expect(r.pathDisplay).toBe('/Photos/Lyon/a.jpg');
+    expect(r.name).toBe('a.jpg');
+    expect(r.capturedAt).toBe('2024-06-01T00:00:00Z');
+  });
+
+  it('should return the same reference when the key is not found', () => {
+    const records = { 'id:a': structuredClone(base) };
+    const result = transitionToGroup(records, 'id:missing', 'g1');
+    expect(result).toBe(records);
+  });
+
+  it('should be idempotent when called twice with the same groupId', () => {
+    const records = { 'id:a': structuredClone(base) };
+    const once = transitionToGroup(records, 'id:a', 'g1');
+    const twice = transitionToGroup(once, 'id:a', 'g1');
+    expect(twice['id:a'].groupId).toBe('g1');
+    expect(twice['id:a'].flag).toBeUndefined();
   });
 });
 

@@ -62,6 +62,21 @@ export async function writeGroups(groups: Group[]): Promise<void> {
   await invoke('write_groups', { contents: JSON.stringify(groups, null, 2) });
 }
 
+// Orchestrators — async I/O operations that compose the pure helpers above
+
+export async function createGroupAndPersist(args: {
+  name: string;
+  lat: number;
+  lng: number;
+  placeId?: string;
+  photoIds: string[];
+}): Promise<Group> {
+  const group = createGroup(args);
+  const existing = await readGroups();
+  await writeGroups([...existing, group]);
+  return group;
+}
+
 // Cascade orchestrator — removes the group and clears groupId from member photos
 
 export async function deleteGroupAndCascade(id: string): Promise<void> {
