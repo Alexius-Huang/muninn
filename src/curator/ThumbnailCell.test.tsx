@@ -62,6 +62,20 @@ describe('ThumbnailCell', () => {
     expect(screen.queryByTestId('flag-discard')).not.toBeInTheDocument();
   });
 
+  it('should render the grouped badge when groupId is set', () => {
+    // Given a photo with a groupId (Location Grouping epic)
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} groupId="g1" onClick={vi.fn()} />);
+    // Then the badge overlay is present
+    expect(screen.getByTestId('grouped')).toBeInTheDocument();
+  });
+
+  it('should omit the grouped badge when groupId is undefined', () => {
+    // Given a photo with no groupId
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} onClick={vi.fn()} />);
+    // Then no grouped badge appears
+    expect(screen.queryByTestId('grouped')).not.toBeInTheDocument();
+  });
+
   it('should set aria-current="true" when isActive is true', () => {
     render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'loading' }} isActive={true} onClick={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'photo.jpg' })).toHaveAttribute('aria-current', 'true');

@@ -196,4 +196,101 @@ describe('ThumbnailGrid', () => {
     });
     expect(screen.queryByTestId('flag-keep')).not.toBeInTheDocument();
   });
+
+  describe('Show grouped toggle', () => {
+    it('should not render the toggle when onToggleShowGrouped is omitted', async () => {
+      // Given no toggle callback provided (backward-compatible default)
+      const entries = [makeFile('a.jpg', '/Lyon/a.jpg')];
+      await act(async () => {
+        render(<ThumbnailGrid path="/Lyon" entries={entries} cache={makeMockCache()} flags={{}} onSelect={vi.fn()} />);
+      });
+      // Then the toggle button is absent
+      expect(screen.queryByRole('button', { name: 'Show grouped' })).not.toBeInTheDocument();
+    });
+
+    it('should render the toggle with aria-pressed="true" when showGrouped is true', async () => {
+      // Given a grid with the toggle enabled (default on)
+      const entries = [makeFile('a.jpg', '/Lyon/a.jpg')];
+      await act(async () => {
+        render(
+          <ThumbnailGrid
+            path="/Lyon"
+            entries={entries}
+            cache={makeMockCache()}
+            flags={{}}
+            showGrouped={true}
+            onToggleShowGrouped={vi.fn()}
+            onSelect={vi.fn()}
+          />,
+        );
+      });
+      // Then the button reports pressed state
+      const btn = screen.getByRole('button', { name: 'Show grouped' });
+      expect(btn).toBeInTheDocument();
+      expect(btn).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('should render the toggle with aria-pressed="false" when showGrouped is false', async () => {
+      // Given the toggle is off
+      const entries = [makeFile('a.jpg', '/Lyon/a.jpg')];
+      await act(async () => {
+        render(
+          <ThumbnailGrid
+            path="/Lyon"
+            entries={entries}
+            cache={makeMockCache()}
+            flags={{}}
+            showGrouped={false}
+            onToggleShowGrouped={vi.fn()}
+            onSelect={vi.fn()}
+          />,
+        );
+      });
+      const btn = screen.getByRole('button', { name: 'Show grouped' });
+      expect(btn).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('should call onToggleShowGrouped when the toggle is clicked', async () => {
+      const user = userEvent.setup();
+      const onToggle = vi.fn();
+      const entries = [makeFile('a.jpg', '/Lyon/a.jpg')];
+      await act(async () => {
+        render(
+          <ThumbnailGrid
+            path="/Lyon"
+            entries={entries}
+            cache={makeMockCache()}
+            flags={{}}
+            showGrouped={true}
+            onToggleShowGrouped={onToggle}
+            onSelect={vi.fn()}
+          />,
+        );
+      });
+      await user.click(screen.getByRole('button', { name: 'Show grouped' }));
+      expect(onToggle).toHaveBeenCalledOnce();
+    });
+
+    it('should render the grouped badge for files present in the groupIds map', async () => {
+      // Given two files where one is grouped
+      const entries = [makeFile('a.jpg', '/Lyon/a.jpg'), makeFile('b.jpg', '/Lyon/b.jpg')];
+      const groupIds = { 'id:a.jpg': 'g1' };
+      await act(async () => {
+        render(
+          <ThumbnailGrid
+            path="/Lyon"
+            entries={entries}
+            cache={makeMockCache()}
+            flags={{}}
+            groupIds={groupIds}
+            showGrouped={true}
+            onToggleShowGrouped={vi.fn()}
+            onSelect={vi.fn()}
+          />,
+        );
+      });
+      // Then exactly one grouped badge is shown
+      expect(screen.getAllByTestId('grouped')).toHaveLength(1);
+    });
+  });
 });

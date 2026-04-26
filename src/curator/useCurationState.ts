@@ -4,6 +4,7 @@ import type { DropboxFile } from '../dropbox/client';
 
 export type CurationStateReturn = {
   flags: Record<string, Flag>;
+  groupIds: Record<string, string>;
   setFlag: (file: DropboxFile, value: Flag | undefined) => void;
   clearAll: () => void;
   flush: () => Promise<void>;
@@ -123,5 +124,15 @@ export function useCurationState(folderPath: string | null, files: DropboxFile[]
     [records],
   );
 
-  return { flags, setFlag, clearAll, flush, reload };
+  const groupIds = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(records)
+          .filter(([, r]) => r.groupId !== undefined)
+          .map(([k, r]) => [k, r.groupId as string]),
+      ),
+    [records],
+  );
+
+  return { flags, groupIds, setFlag, clearAll, flush, reload };
 }

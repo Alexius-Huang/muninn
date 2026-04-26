@@ -38,6 +38,7 @@ export function Connected({ account, onDisconnect }: Props) {
   const [tab, setTab] = useState<'browse' | 'flagged'>('browse');
   const [active, setActive] = useState<Active | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [showGrouped, setShowGrouped] = useState(true);
   const [columns, setColumns] = useState(4);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [previewWidth, setPreviewWidth] = useState(480);
@@ -48,8 +49,13 @@ export function Connected({ account, onDisconnect }: Props) {
   const pendingTabRef = useRef<'browse' | 'flagged' | null>(null);
 
   const cache = useThumbnailCache();
-  const files = active ? sortFiles(active.entries) : [];
-  const { flags, setFlag, clearAll, flush: flushBrowse, reload: reloadBrowse } = useCurationState(active?.path ?? null, files);
+  const { flags, groupIds, setFlag, clearAll, flush: flushBrowse, reload: reloadBrowse } = useCurationState(active?.path ?? null, active ? sortFiles(active.entries) : []);
+  const visibleEntries = active
+    ? (showGrouped
+        ? active.entries
+        : active.entries.filter((e) => e['.tag'] !== 'file' || !groupIds[e.id]))
+    : [];
+  const files = sortFiles(visibleEntries);
   const { records: flaggedRecords, setFlag: setFlaggedFlag, clearAll: clearAllFlagged, assignGroupId, flush: flushFlagged, reload: reloadFlagged, loading: flaggedLoading } = useAllFlagged();
 
   async function handleCreateGroup({ name, location, photos }: {
@@ -241,9 +247,12 @@ export function Connected({ account, onDisconnect }: Props) {
                 <ThumbnailGrid
                   key={active.path}
                   path={active.path}
-                  entries={active.entries}
+                  entries={visibleEntries}
                   cache={cache}
                   flags={flags}
+                  groupIds={groupIds}
+                  showGrouped={showGrouped}
+                  onToggleShowGrouped={() => { setShowGrouped((s) => !s); setSelectedIndex(null); }}
                   activeIndex={selectedIndex}
                   onSelect={setSelectedIndex}
                   onClearAll={clearAll}

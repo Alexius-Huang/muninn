@@ -28,11 +28,13 @@ function useCacheContext(): ThumbnailCache {
 function ConnectedCell({
   file,
   flag,
+  groupId,
   isActive,
   onSelect,
 }: {
   file: DropboxFile;
   flag: CurationFlags[string] | undefined;
+  groupId?: string;
   isActive: boolean;
   onSelect: () => void;
 }) {
@@ -54,7 +56,7 @@ function ConnectedCell({
     }
   }, [isActive]);
 
-  return <ThumbnailCell ref={cellRef} file={file} state={state} flag={flag} isActive={isActive} onClick={onSelect} />;
+  return <ThumbnailCell ref={cellRef} file={file} state={state} flag={flag} groupId={groupId} isActive={isActive} onClick={onSelect} />;
 }
 
 type Props = {
@@ -62,6 +64,9 @@ type Props = {
   entries: DropboxEntry[];
   cache: ThumbnailCache;
   flags: CurationFlags;
+  groupIds?: Record<string, string>;
+  showGrouped?: boolean;
+  onToggleShowGrouped?: () => void;
   activeIndex?: number | null;
   onSelect: (index: number) => void;
   onClearAll?: () => void;
@@ -74,7 +79,7 @@ export function sortFiles(entries: DropboxEntry[]): DropboxFile[] {
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
-export function ThumbnailGrid({ path, entries, cache, flags, activeIndex, onSelect, onClearAll, onColumnsChange }: Props) {
+export function ThumbnailGrid({ path, entries, cache, flags, groupIds, showGrouped, onToggleShowGrouped, activeIndex, onSelect, onClearAll, onColumnsChange }: Props) {
   const files = sortFiles(entries);
   const displayPath = path === '' ? '/' : path;
   const flagCount = Object.keys(flags).length;
@@ -119,10 +124,21 @@ export function ThumbnailGrid({ path, entries, cache, flags, activeIndex, onSele
   return (
     <CacheContext.Provider value={cache}>
       <div className="flex flex-col h-full">
-        <div className="shrink-0 px-6 pt-4 pb-3 bg-nord-0 border-b border-nord-3 flex items-center justify-between">
-          <h2 className="text-nord-6 font-semibold text-lg">
+        <div className="shrink-0 px-6 pt-4 pb-3 bg-nord-0 border-b border-nord-3 flex items-center gap-2">
+          <h2 className="text-nord-6 font-semibold text-lg mr-auto">
             {files.length} photos in {displayPath}
           </h2>
+          {onToggleShowGrouped && (
+            <button
+              onClick={onToggleShowGrouped}
+              aria-pressed={showGrouped ?? true}
+              className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                (showGrouped ?? true) ? 'bg-nord-2 text-nord-6' : 'text-nord-4 hover:bg-nord-1'
+              }`}
+            >
+              Show grouped
+            </button>
+          )}
           {onClearAll && (
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <button
@@ -192,6 +208,7 @@ export function ThumbnailGrid({ path, entries, cache, flags, activeIndex, onSele
                         key={file.path_lower}
                         file={file}
                         flag={flags[file.id]}
+                        groupId={groupIds?.[file.id]}
                         isActive={activeIndex === startIndex + colIdx}
                         onSelect={() => onSelect(startIndex + colIdx)}
                       />

@@ -269,6 +269,62 @@ describe('useCurationState', () => {
     expect(writeIdx).toBeLessThan(readIdx);
   });
 
+  describe('groupIds derivation', () => {
+    it('should return an empty map when no records have a groupId', async () => {
+      mockReadCuration.mockResolvedValue(null);
+      const { result } = renderHook(() => useCurationState('/Photos/Lyon', []));
+      await act(async () => {});
+      expect(result.current.groupIds).toEqual({});
+    });
+
+    it('should include records that have groupId set', async () => {
+      // Given a curation file with one grouped record
+      mockReadCuration.mockResolvedValue({
+        folderPath: '/Photos/Lyon',
+        records: {
+          'id:a.jpg': { photoId: 'id:a.jpg', pathLower: '/photos/lyon/a.jpg', pathDisplay: '/Photos/Lyon/a.jpg', name: 'a.jpg', groupId: 'g1' },
+        },
+      });
+      const { result } = renderHook(() => useCurationState('/Photos/Lyon', []));
+      // When records load
+      await act(async () => {});
+      // Then groupIds contains the mapping
+      expect(result.current.groupIds['id:a.jpg']).toBe('g1');
+    });
+
+    it('should exclude records that only have flag set', async () => {
+      // Given a flagged record (no groupId)
+      mockReadCuration.mockResolvedValue({
+        folderPath: '/Photos/Lyon',
+        records: {
+          'id:a.jpg': { photoId: 'id:a.jpg', pathLower: '/photos/lyon/a.jpg', pathDisplay: '/Photos/Lyon/a.jpg', name: 'a.jpg', flag: 'keep' },
+        },
+      });
+      const { result } = renderHook(() => useCurationState('/Photos/Lyon', []));
+      await act(async () => {});
+      // Then groupIds is empty (flag-only records are excluded)
+      expect(result.current.groupIds).toEqual({});
+    });
+
+    it('should update groupIds after setFlag transitions a grouped record back to a flag', async () => {
+      // Given a record with groupId
+      mockReadCuration.mockResolvedValue({
+        folderPath: '/Photos/Lyon',
+        records: {
+          'id:a.jpg': { photoId: 'id:a.jpg', pathLower: '/photos/lyon/a.jpg', pathDisplay: '/Photos/Lyon/a.jpg', name: 'a.jpg', groupId: 'g1' },
+        },
+      });
+      const file = makeFile('a.jpg', '/Photos/Lyon/a.jpg');
+      const { result } = renderHook(() => useCurationState('/Photos/Lyon', []));
+      await act(async () => {});
+      expect(result.current.groupIds['id:a.jpg']).toBe('g1');
+      // When flag is applied (XOR: clears groupId)
+      act(() => { result.current.setFlag(file, 'keep'); });
+      // Then groupIds no longer contains the record
+      expect(result.current.groupIds['id:a.jpg']).toBeUndefined();
+    });
+  });
+
   it('should clear groupId when setFlag is called on a record that previously had a groupId', async () => {
     mockReadCuration.mockResolvedValue({
       folderPath: '/Photos/Lyon',
