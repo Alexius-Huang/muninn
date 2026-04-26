@@ -92,7 +92,7 @@ export function NominatimSearch({ onSelect, email, placeholder = 'Search for a p
   }
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="relative flex flex-col gap-1">
       <input
         type="text"
         value={query}
@@ -106,7 +106,7 @@ export function NominatimSearch({ onSelect, email, placeholder = 'Search for a p
       )}
 
       {status === 'idle' && results.length > 0 && (
-        <ul className="rounded border border-zinc-700 bg-zinc-900 overflow-hidden">
+        <ul className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded border border-zinc-700 bg-zinc-900 shadow-lg">
           {results.map((r) => (
             <li key={r.placeId}>
               <button
