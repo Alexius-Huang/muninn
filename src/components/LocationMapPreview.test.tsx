@@ -20,6 +20,12 @@ const LAT = 48.858;
 const LNG = 2.294;
 
 describe('LocationMapPreview', () => {
+  it('should show a placeholder when lat/lng are null', () => {
+    render(<LocationMapPreview lat={null} lng={null} />);
+    expect(screen.getByText(/select a location to preview on map/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('map-container')).not.toBeInTheDocument();
+  });
+
   it('should render without throwing for valid coordinates', () => {
     expect(() => render(<LocationMapPreview lat={LAT} lng={LNG} />)).not.toThrow();
   });

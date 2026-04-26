@@ -60,7 +60,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent className="min-w-[720px] max-w-[820px]">
         <DialogHeader>
           <DialogTitle>Create group</DialogTitle>
           <DialogDescription>
@@ -120,13 +120,11 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
             )}
           </div>
 
-          {selectedLocation && (
-            <LocationMapPreview
-              key={selectedLocation.placeId}
-              lat={selectedLocation.lat}
-              lng={selectedLocation.lng}
-            />
-          )}
+          <LocationMapPreview
+            key={selectedLocation?.placeId ?? 'empty'}
+            lat={selectedLocation?.lat ?? null}
+            lng={selectedLocation?.lng ?? null}
+          />
         </div>
 
         <DialogFooter>
