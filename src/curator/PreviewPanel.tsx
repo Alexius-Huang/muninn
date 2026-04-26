@@ -155,9 +155,7 @@ export function PreviewPanel({
             <MapPin size={14} className="text-nord-9 shrink-0 mt-0.5" />
             <div className="min-w-0">
               <p className="text-nord-6 text-sm font-medium truncate">{groupInfo.name}</p>
-              {groupInfo.locationName && (
-                <p className="text-nord-4 text-xs truncate">{groupInfo.locationName}</p>
-              )}
+              <p className="text-nord-4 text-xs truncate">{groupInfo.locationName ?? 'No location'}</p>
             </div>
           </div>
           {onRemoveFromGroup && (

@@ -299,7 +299,7 @@ export function Connected({ account, onDisconnect }: Props) {
                   onClose={() => setSelectedIndex(null)}
                   onNavigate={handleNavigate}
                   onFlag={(value) => setFlag(selectedFile, value)}
-                  onRemoveFromGroup={selectedGroupInfo ? () => { removeFromGroup(selectedFile); setSelectedIndex(null); } : undefined}
+                  onRemoveFromGroup={selectedGroupInfo ? () => { removeFromGroup(selectedFile); } : undefined}
                 />
               </>
             )}
