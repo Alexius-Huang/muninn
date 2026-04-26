@@ -1,5 +1,16 @@
 import 'leaflet/dist/leaflet.css';
-import { MapContainer, TileLayer, CircleMarker } from 'react-leaflet';
+import L from 'leaflet';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+
+const pinIcon = L.divIcon({
+  html: `<svg viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 24 12 24s12-15 12-24C24 5.373 18.627 0 12 0z" fill="#bf616a"/>
+    <circle cx="12" cy="12" r="4.5" fill="rgba(255,255,255,0.9)"/>
+  </svg>`,
+  className: '',
+  iconSize: [24, 36],
+  iconAnchor: [12, 36],
+});
 
 type Props = {
   lat: number | null;
@@ -26,17 +37,14 @@ export function LocationMapPreview({ lat, lng, zoom, className }: Props) {
         zoom={zoom ?? 14}
         zoomControl={false}
         attributionControl={false}
+        className="muninn-map"
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           subdomains="abcd"
         />
-        <CircleMarker
-          center={[lat, lng]}
-          radius={7}
-          pathOptions={{ color: '#bf616a', fillColor: '#bf616a', fillOpacity: 0.85, weight: 2 }}
-        />
+        <Marker position={[lat, lng]} icon={pinIcon} />
       </MapContainer>
     </div>
   );

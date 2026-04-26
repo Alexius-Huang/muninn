@@ -71,3 +71,13 @@ html, body, #root {
   height: 100%;
   background-color: var(--color-nord-0);
 }
+
+/* Scope Nord colour tinting to the map preview only */
+.muninn-map {
+  background: #2e3440; /* nord-0 — visible while tiles load */
+}
+.muninn-map .leaflet-tile-pane {
+  /* hue-rotate shifts warm Voyager land tones toward nord-14 green;
+     saturate + brightness mute and darken so sea reads heavier than land */
+  filter: hue-rotate(50deg) saturate(0.75) brightness(0.88);
+}

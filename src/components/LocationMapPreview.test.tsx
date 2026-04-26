@@ -6,11 +6,9 @@ vi.mock('react-leaflet', () => ({
   MapContainer: ({ center, children }: { center: [number, number]; children: React.ReactNode }) => (
     <div data-testid="map-container" data-center={JSON.stringify(center)}>{children}</div>
   ),
-  TileLayer: ({ attribution }: { attribution: string }) => (
-    <div data-testid="tile-layer" data-attribution={attribution} />
-  ),
-  CircleMarker: ({ center }: { center: [number, number] }) => (
-    <div data-testid="circle-marker" data-center={JSON.stringify(center)} />
+  TileLayer: () => <div data-testid="tile-layer" />,
+  Marker: ({ position }: { position: [number, number] }) => (
+    <div data-testid="map-marker" data-position={JSON.stringify(position)} />
   ),
 }));
 
@@ -38,7 +36,7 @@ describe('LocationMapPreview', () => {
 
   it('should place the marker on the provided lat/lng', () => {
     render(<LocationMapPreview lat={LAT} lng={LNG} />);
-    const marker = screen.getByTestId('circle-marker');
-    expect(JSON.parse(marker.dataset.center!)).toEqual([LAT, LNG]);
+    const marker = screen.getByTestId('map-marker');
+    expect(JSON.parse(marker.dataset.position!)).toEqual([LAT, LNG]);
   });
 });
