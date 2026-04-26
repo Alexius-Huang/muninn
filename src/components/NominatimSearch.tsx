@@ -106,15 +106,15 @@ export function NominatimSearch({ onSelect, email, placeholder = 'Search for a p
       )}
 
       {status === 'idle' && results.length > 0 && (
-        <ul className="rounded border border-zinc-700 bg-zinc-900">
+        <ul className="rounded border border-zinc-700 bg-zinc-900 overflow-hidden">
           {results.map((r) => (
             <li key={r.placeId}>
               <button
                 type="button"
                 onClick={() => handleSelect(r)}
-                className="w-full px-3 py-2 text-left hover:bg-zinc-800 focus:bg-zinc-800 focus:outline-none"
+                className="w-full min-w-0 px-3 py-2 text-left hover:bg-zinc-800 focus:bg-zinc-800 focus:outline-none"
               >
-                <span className="block text-sm font-medium text-zinc-100">{r.name}</span>
+                <span className="block truncate text-sm font-medium text-zinc-100">{r.name}</span>
                 <span className="block truncate text-xs text-zinc-400">{r.displayName}</span>
               </button>
             </li>
