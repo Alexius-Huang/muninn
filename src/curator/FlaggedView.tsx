@@ -6,6 +6,8 @@ import { FlaggedGrid } from './FlaggedGrid';
 import type { AllFlaggedReturn } from './useAllFlagged';
 import type { ThumbnailCache } from './useThumbnailCache';
 import type { Flag } from './curation';
+import { CreateGroupModal } from './CreateGroupModal';
+import type { NominatimLocation } from '@/components/NominatimSearch';
 import {
   Dialog,
   DialogContent,
@@ -23,13 +25,20 @@ type Props = Pick<AllFlaggedReturn, 'records' | 'setFlag' | 'clearAll' | 'loadin
   previewWidth: number;
   isResizing?: boolean;
   onPreviewResize: (e: React.MouseEvent) => void;
+  email: string;
+  onCreateGroup: (args: {
+    name: string;
+    location: NominatimLocation;
+    photos: { folderPath: string; key: string }[];
+  }) => Promise<void>;
 };
 
-export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cache, previewWidth, isResizing = false, onPreviewResize }: Props) {
+export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cache, previewWidth, isResizing = false, onPreviewResize, email, onCreateGroup }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [columns, setColumns] = useState(4);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
 
   const filtered = filter === 'all' ? records : records.filter((r) => r.record.flag === filter);
 
@@ -96,6 +105,14 @@ export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cac
             {f === 'all' ? 'All' : f === 'keep' ? 'Keep' : 'Discard'}
           </button>
         ))}
+        {filter === 'keep' && filtered.length > 0 && (
+          <button
+            onClick={() => setCreateGroupOpen(true)}
+            className="px-3 py-1 rounded-lg bg-nord-8 text-white hover:bg-nord-9 transition-colors text-sm"
+          >
+            Create Group
+          </button>
+        )}
         <div className="ml-auto">
           <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
             <button
@@ -172,6 +189,19 @@ export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cac
           </>
         )}
       </div>
+
+      <CreateGroupModal
+        open={createGroupOpen}
+        onOpenChange={(next) => {
+          setCreateGroupOpen(next);
+          if (!next) setSelectedIndex(null);
+        }}
+        email={email}
+        photoCount={filtered.length}
+        onSubmit={({ name, location }) =>
+          onCreateGroup({ name, location, photos: filtered.map(({ folderPath, key }) => ({ folderPath, key })) })
+        }
+      />
     </div>
   );
 }

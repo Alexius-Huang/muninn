@@ -4,7 +4,7 @@ const mockInvoke = vi.fn();
 vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => mockInvoke(...args) }));
 
 // groups.ts imports curation.ts which also imports @tauri-apps/api/core — mock covers both
-import { createGroup, updateGroup, deleteGroup, getGroup, listGroups, readGroups, writeGroups, deleteGroupAndCascade, type Group } from './groups';
+import { createGroup, updateGroup, deleteGroup, getGroup, listGroups, readGroups, writeGroups, createGroupAndPersist, deleteGroupAndCascade, type Group } from './groups';
 
 beforeEach(() => mockInvoke.mockReset());
 
@@ -121,6 +121,52 @@ describe('writeGroups', () => {
     expect(mockInvoke).toHaveBeenCalledWith('write_groups', {
       contents: JSON.stringify(groups, null, 2),
     });
+  });
+});
+
+describe('createGroupAndPersist', () => {
+  it('should generate a Group with the given photoIds and persist it', async () => {
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'read_groups') return Promise.resolve(JSON.stringify([]));
+      if (cmd === 'write_groups') return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
+    const group = await createGroupAndPersist({ name: 'Eiffel Tower', lat: 48.858, lng: 2.294, placeId: 'p1', photoIds: ['id:a', 'id:b'] });
+    expect(group.name).toBe('Eiffel Tower');
+    expect(group.photoIds).toEqual(['id:a', 'id:b']);
+    expect(group.placeId).toBe('p1');
+    const writeCall = mockInvoke.mock.calls.find((c) => c[0] === 'write_groups');
+    const written = JSON.parse(writeCall![1].contents) as Group[];
+    expect(written).toHaveLength(1);
+    expect(written[0].id).toBe(group.id);
+  });
+
+  it('should append to existing groups, not replace', async () => {
+    const existing: Group[] = [{ id: 'g-existing', name: 'Old Place', lat: 0, lng: 0, photoIds: [] }];
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'read_groups') return Promise.resolve(JSON.stringify(existing));
+      if (cmd === 'write_groups') return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
+    await createGroupAndPersist({ name: 'New Place', lat: 1, lng: 2, photoIds: ['id:x'] });
+    const writeCall = mockInvoke.mock.calls.find((c) => c[0] === 'write_groups');
+    const written = JSON.parse(writeCall![1].contents) as Group[];
+    expect(written).toHaveLength(2);
+    expect(written[0].id).toBe('g-existing');
+    expect(written[1].name).toBe('New Place');
+  });
+
+  it('should return the new Group with a freshly-generated id', async () => {
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'read_groups') return Promise.resolve(JSON.stringify([]));
+      if (cmd === 'write_groups') return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
+    const g1 = await createGroupAndPersist({ name: 'A', lat: 0, lng: 0, photoIds: [] });
+    const g2 = await createGroupAndPersist({ name: 'B', lat: 0, lng: 0, photoIds: [] });
+    expect(g1.id).toBeTruthy();
+    expect(g2.id).toBeTruthy();
+    expect(g1.id).not.toBe(g2.id);
   });
 });
 

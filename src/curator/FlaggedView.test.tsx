@@ -14,6 +14,17 @@ vi.mock('../dropbox/client', async (importOriginal) => {
   };
 });
 
+vi.mock('./CreateGroupModal', () => ({
+  CreateGroupModal: ({ open, onSubmit }: { open: boolean; onSubmit: (args: { name: string; location: unknown }) => Promise<void> }) =>
+    open ? (
+      <div data-testid="create-group-modal">
+        <button onClick={() => onSubmit({ name: 'Test Group', location: { name: 'Paris', lat: 48, lng: 2, placeId: 'p1', displayName: 'Paris, France' } })}>
+          Submit modal
+        </button>
+      </div>
+    ) : null,
+}));
+
 const LOADING_STATE = { tag: 'loading' as const };
 const mockCache: ThumbnailCache = {
   request: vi.fn(() => LOADING_STATE),
@@ -55,6 +66,8 @@ const DEFAULT_PROPS = {
   cache: mockCache,
   previewWidth: 480,
   onPreviewResize: vi.fn(),
+  email: 'test@example.com',
+  onCreateGroup: vi.fn().mockResolvedValue(undefined),
 };
 
 describe('FlaggedView', () => {
@@ -134,5 +147,57 @@ describe('FlaggedView', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /close preview/i })).toBeInTheDocument());
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('button', { name: /close preview/i })).not.toBeInTheDocument();
+  });
+
+  describe('Create Group button', () => {
+    it('should not render Create Group button on the All filter', async () => {
+      const records = [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')];
+      render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+      expect(screen.queryByRole('button', { name: 'Create Group' })).not.toBeInTheDocument();
+    });
+
+    it('should not render Create Group button on the Keep filter when there are zero keep records', async () => {
+      const user = userEvent.setup();
+      const records = [makeFlat('/Photos/Lyon', 'discard.jpg', 'discard')];
+      render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+      await user.click(screen.getByRole('button', { name: 'Keep' }));
+      expect(screen.queryByRole('button', { name: 'Create Group' })).not.toBeInTheDocument();
+    });
+
+    it('should render Create Group button on the Keep filter when ≥1 keep record exists', async () => {
+      const user = userEvent.setup();
+      const records = [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')];
+      render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+      await user.click(screen.getByRole('button', { name: 'Keep' }));
+      expect(screen.getByRole('button', { name: 'Create Group' })).toBeInTheDocument();
+    });
+
+    it('should open the modal when Create Group is clicked', async () => {
+      const user = userEvent.setup();
+      const records = [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')];
+      render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+      await user.click(screen.getByRole('button', { name: 'Keep' }));
+      await user.click(screen.getByRole('button', { name: 'Create Group' }));
+      expect(screen.getByTestId('create-group-modal')).toBeInTheDocument();
+    });
+
+    it('should call onCreateGroup with the visible keep photos when the modal submits', async () => {
+      const onCreateGroup = vi.fn().mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      const records = [
+        makeFlat('/Photos/Lyon', 'keep.jpg', 'keep'),
+        makeFlat('/Photos/Paris', 'keep2.jpg', 'keep'),
+      ];
+      render(<FlaggedView {...DEFAULT_PROPS} records={records} onCreateGroup={onCreateGroup} />);
+      await user.click(screen.getByRole('button', { name: 'Keep' }));
+      await user.click(screen.getByRole('button', { name: 'Create Group' }));
+      await user.click(screen.getByRole('button', { name: 'Submit modal' }));
+      expect(onCreateGroup).toHaveBeenCalledOnce();
+      const call = onCreateGroup.mock.calls[0][0];
+      expect(call.name).toBe('Test Group');
+      expect(call.photos).toHaveLength(2);
+      expect(call.photos.map((p: { key: string }) => p.key)).toContain('/photos/lyon/keep.jpg');
+      expect(call.photos.map((p: { key: string }) => p.key)).toContain('/photos/paris/keep2.jpg');
+    });
   });
 });

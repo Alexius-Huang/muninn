@@ -10,6 +10,8 @@ import { useCurationState } from './useCurationState';
 import { useAllFlagged } from './useAllFlagged';
 import { wrapIndex, jumpRow } from './navigate';
 import type { NavigateDirection } from './PreviewPanel';
+import { createGroupAndPersist } from './groups';
+import type { NominatimLocation } from '@/components/NominatimSearch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shadcn/tabs';
 
 type Props = {
@@ -48,7 +50,22 @@ export function Connected({ account, onDisconnect }: Props) {
   const cache = useThumbnailCache();
   const files = active ? sortFiles(active.entries) : [];
   const { flags, setFlag, clearAll, flush: flushBrowse, reload: reloadBrowse } = useCurationState(active?.path ?? null, files);
-  const { records: flaggedRecords, setFlag: setFlaggedFlag, clearAll: clearAllFlagged, flush: flushFlagged, reload: reloadFlagged, loading: flaggedLoading } = useAllFlagged();
+  const { records: flaggedRecords, setFlag: setFlaggedFlag, clearAll: clearAllFlagged, assignGroupId, flush: flushFlagged, reload: reloadFlagged, loading: flaggedLoading } = useAllFlagged();
+
+  async function handleCreateGroup({ name, location, photos }: {
+    name: string;
+    location: NominatimLocation;
+    photos: { folderPath: string; key: string }[];
+  }) {
+    const group = await createGroupAndPersist({
+      name,
+      lat: location.lat,
+      lng: location.lng,
+      placeId: location.placeId,
+      photoIds: photos.map((p) => p.key),
+    });
+    await assignGroupId(photos, group.id);
+  }
 
   async function handleDisconnect() {
     if (!confirmingDisconnect) {
@@ -274,6 +291,8 @@ export function Connected({ account, onDisconnect }: Props) {
             previewWidth={previewWidth}
             isResizing={isDraggingPreview}
             onPreviewResize={handlePreviewResizeStart}
+            email={account.email}
+            onCreateGroup={handleCreateGroup}
           />
         </TabsContent>
       </main>
