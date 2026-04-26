@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { readCuration, writeCuration, migrateToIdKeys, applyFlag, type CurationFile, type Flag } from './curation';
+import { readCuration, writeCuration, migrateToIdKeys, applyFlag, applyGroupId, type CurationFile, type Flag } from './curation';
 import type { DropboxFile } from '../dropbox/client';
 
 export type CurationStateReturn = {
   flags: Record<string, Flag>;
+  groupIds: Record<string, string>;
   setFlag: (file: DropboxFile, value: Flag | undefined) => void;
+  removeFromGroup: (file: DropboxFile) => void;
   clearAll: () => void;
   flush: () => Promise<void>;
   reload: () => Promise<void>;
@@ -96,6 +98,22 @@ export function useCurationState(folderPath: string | null, files: DropboxFile[]
     }, 250);
   }, []);
 
+  const removeFromGroup = useCallback((file: DropboxFile) => {
+    const next = applyGroupId(recordsRef.current, file, undefined);
+    recordsRef.current = next;
+    setRecords({ ...recordsRef.current });
+    dirtyRef.current = true;
+
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      dirtyRef.current = false;
+      if (folderPathRef.current) {
+        writeCuration({ folderPath: folderPathRef.current, records: recordsRef.current });
+      }
+    }, 250);
+  }, []);
+
   const reload = useCallback(async (): Promise<void> => {
     const folderPath = folderPathRef.current;
     if (!folderPath) return;
@@ -123,5 +141,15 @@ export function useCurationState(folderPath: string | null, files: DropboxFile[]
     [records],
   );
 
-  return { flags, setFlag, clearAll, flush, reload };
+  const groupIds = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(records)
+          .filter(([, r]) => r.groupId !== undefined)
+          .map(([k, r]) => [k, r.groupId as string]),
+      ),
+    [records],
+  );
+
+  return { flags, groupIds, setFlag, removeFromGroup, clearAll, flush, reload };
 }

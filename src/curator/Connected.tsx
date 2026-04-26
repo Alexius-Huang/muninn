@@ -1,16 +1,18 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { DropboxAccount, DropboxEntry } from '../dropbox/client';
 import { disconnect } from '../auth/dropboxAuth';
 import { FolderTree } from './FolderTree';
 import { ThumbnailGrid, sortFiles } from './ThumbnailGrid';
 import { PreviewPanel } from './PreviewPanel';
+import type { GroupInfo } from './PreviewPanel';
 import { FlaggedView } from './FlaggedView';
 import { useThumbnailCache } from './useThumbnailCache';
 import { useCurationState } from './useCurationState';
 import { useAllFlagged } from './useAllFlagged';
 import { wrapIndex, jumpRow } from './navigate';
 import type { NavigateDirection } from './PreviewPanel';
-import { createGroupAndPersist } from './groups';
+import { createGroupAndPersist, readGroups } from './groups';
+import type { Group } from './groups';
 import type { NominatimLocation } from '@/components/NominatimSearch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shadcn/tabs';
 
@@ -38,6 +40,7 @@ export function Connected({ account, onDisconnect }: Props) {
   const [tab, setTab] = useState<'browse' | 'flagged'>('browse');
   const [active, setActive] = useState<Active | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [showGrouped, setShowGrouped] = useState(true);
   const [columns, setColumns] = useState(4);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [previewWidth, setPreviewWidth] = useState(480);
@@ -47,9 +50,20 @@ export function Connected({ account, onDisconnect }: Props) {
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const pendingTabRef = useRef<'browse' | 'flagged' | null>(null);
 
+  const [groups, setGroups] = useState<Group[]>([]);
+
+  useEffect(() => {
+    readGroups().then(setGroups).catch(() => {});
+  }, []);
+
   const cache = useThumbnailCache();
-  const files = active ? sortFiles(active.entries) : [];
-  const { flags, setFlag, clearAll, flush: flushBrowse, reload: reloadBrowse } = useCurationState(active?.path ?? null, files);
+  const { flags, groupIds, setFlag, removeFromGroup, clearAll, flush: flushBrowse, reload: reloadBrowse } = useCurationState(active?.path ?? null, active ? sortFiles(active.entries) : []);
+  const visibleEntries = active
+    ? (showGrouped
+        ? active.entries
+        : active.entries.filter((e) => e['.tag'] !== 'file' || !groupIds[e.id]))
+    : [];
+  const files = sortFiles(visibleEntries);
   const { records: flaggedRecords, setFlag: setFlaggedFlag, clearAll: clearAllFlagged, assignGroupId, flush: flushFlagged, reload: reloadFlagged, loading: flaggedLoading } = useAllFlagged();
 
   async function handleCreateGroup({ name, location, photos }: {
@@ -62,9 +76,11 @@ export function Connected({ account, onDisconnect }: Props) {
       lat: location.lat,
       lng: location.lng,
       placeId: location.placeId,
+      locationName: location.displayName,
       photoIds: photos.map((p) => p.key),
     });
     await assignGroupId(photos, group.id);
+    readGroups().then(setGroups).catch(() => {});
   }
 
   async function handleDisconnect() {
@@ -142,6 +158,15 @@ export function Connected({ account, onDisconnect }: Props) {
           return s.tag === 'success' ? s.dataUrl : undefined;
         })()
       : undefined;
+
+  const selectedGroupInfo: GroupInfo | undefined = (() => {
+    if (!selectedFile) return undefined;
+    const gid = groupIds[selectedFile.id];
+    if (!gid) return undefined;
+    const group = groups.find((g) => g.id === gid);
+    if (!group) return undefined;
+    return { name: group.name, locationName: group.locationName };
+  })();
 
   return (
     <Tabs
@@ -241,9 +266,12 @@ export function Connected({ account, onDisconnect }: Props) {
                 <ThumbnailGrid
                   key={active.path}
                   path={active.path}
-                  entries={active.entries}
+                  entries={visibleEntries}
                   cache={cache}
                   flags={flags}
+                  groupIds={groupIds}
+                  showGrouped={showGrouped}
+                  onToggleShowGrouped={() => { setShowGrouped((s) => !s); setSelectedIndex(null); }}
                   activeIndex={selectedIndex}
                   onSelect={setSelectedIndex}
                   onClearAll={clearAll}
@@ -264,12 +292,14 @@ export function Connected({ account, onDisconnect }: Props) {
                   index={selectedIndex!}
                   total={files.length}
                   flag={flags[selectedFile.id]}
+                  groupInfo={selectedGroupInfo}
                   placeholderDataUrl={placeholderDataUrl}
                   width={previewWidth}
                   isResizing={isDraggingPreview}
                   onClose={() => setSelectedIndex(null)}
                   onNavigate={handleNavigate}
                   onFlag={(value) => setFlag(selectedFile, value)}
+                  onRemoveFromGroup={selectedGroupInfo ? () => { removeFromGroup(selectedFile); } : undefined}
                 />
               </>
             )}

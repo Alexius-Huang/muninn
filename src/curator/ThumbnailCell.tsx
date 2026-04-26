@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, MapPin } from 'lucide-react';
 import type { DropboxFile } from '../dropbox/client';
 import type { ThumbnailState } from './useThumbnailCache';
 import type { Flag } from './curation';
@@ -8,12 +8,13 @@ type Props = {
   file: DropboxFile;
   state: ThumbnailState;
   flag?: Flag;
+  groupId?: string;
   isActive?: boolean;
   ref?: React.Ref<HTMLButtonElement>;
   onClick: () => void;
 };
 
-export function ThumbnailCell({ file, state, flag, isActive = false, ref, onClick }: Props) {
+export function ThumbnailCell({ file, state, flag, groupId, isActive = false, ref, onClick }: Props) {
   const [isLeaving, setIsLeaving] = useState(false);
   const prevActiveRef = useRef(isActive);
 
@@ -80,6 +81,15 @@ export function ThumbnailCell({ file, state, flag, isActive = false, ref, onClic
           className="absolute inset-0 rounded pointer-events-none transition-shadow duration-200 motion-reduce:transition-none"
           style={{ boxShadow: ringShadow }}
         />
+        {groupId && (
+          <div
+            data-testid="grouped"
+            aria-label="grouped"
+            className="absolute top-[6px] right-[6px] rounded-full bg-nord-8/90 backdrop-blur-sm p-1 text-nord-1 pointer-events-none"
+          >
+            <MapPin className="h-3.5 w-3.5" />
+          </div>
+        )}
       </div>
       <p className="w-full text-nord-4 text-xs truncate text-center leading-4" title={file.name}>{file.name}</p>
     </button>

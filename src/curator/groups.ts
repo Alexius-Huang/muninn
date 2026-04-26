@@ -7,6 +7,7 @@ export type Group = {
   lat: number;
   lng: number;
   placeId?: string;
+  locationName?: string;
   photoIds: string[];
 };
 
@@ -17,6 +18,7 @@ export function createGroup(args: {
   lat: number;
   lng: number;
   placeId?: string;
+  locationName?: string;
   photoIds?: string[];
 }): Group {
   const group: Group = {
@@ -27,6 +29,7 @@ export function createGroup(args: {
     photoIds: args.photoIds ?? [],
   };
   if (args.placeId !== undefined) group.placeId = args.placeId;
+  if (args.locationName !== undefined) group.locationName = args.locationName;
   return group;
 }
 
@@ -69,6 +72,7 @@ export async function createGroupAndPersist(args: {
   lat: number;
   lng: number;
   placeId?: string;
+  locationName?: string;
   photoIds: string[];
 }): Promise<Group> {
   const group = createGroup(args);
