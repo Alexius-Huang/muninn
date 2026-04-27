@@ -9,7 +9,10 @@ export type Group = {
   placeId?: string;
   locationName?: string;
   photoIds: string[];
+  createdAt?: string;
 };
+
+export type GroupSort = 'newest' | 'oldest' | 'count' | 'location';
 
 // Pure CRUD — no I/O, return new arrays/objects
 
@@ -27,10 +30,40 @@ export function createGroup(args: {
     lat: args.lat,
     lng: args.lng,
     photoIds: args.photoIds ?? [],
+    createdAt: new Date().toISOString(),
   };
   if (args.placeId !== undefined) group.placeId = args.placeId;
   if (args.locationName !== undefined) group.locationName = args.locationName;
   return group;
+}
+
+export function sortGroups(groups: Group[], sort: GroupSort): Group[] {
+  const sorted = [...groups];
+  switch (sort) {
+    case 'newest':
+      return sorted.sort((a, b) => {
+        if (!a.createdAt && !b.createdAt) return 0;
+        if (!a.createdAt) return 1;
+        if (!b.createdAt) return -1;
+        return b.createdAt.localeCompare(a.createdAt);
+      });
+    case 'oldest':
+      return sorted.sort((a, b) => {
+        if (!a.createdAt && !b.createdAt) return 0;
+        if (!a.createdAt) return 1;
+        if (!b.createdAt) return -1;
+        return a.createdAt.localeCompare(b.createdAt);
+      });
+    case 'count':
+      return sorted.sort((a, b) => {
+        const diff = b.photoIds.length - a.photoIds.length;
+        return diff !== 0 ? diff : a.name.localeCompare(b.name);
+      });
+    case 'location': {
+      const label = (g: Group) => g.locationName ?? `${g.lat},${g.lng}`;
+      return sorted.sort((a, b) => label(a).localeCompare(label(b)));
+    }
+  }
 }
 
 export function updateGroup(

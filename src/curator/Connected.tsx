@@ -15,6 +15,8 @@ import { createGroupAndPersist, readGroups } from './groups';
 import type { Group } from './groups';
 import type { NominatimLocation } from '@/components/NominatimSearch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shadcn/tabs';
+import { GroupsView } from './GroupsView';
+import { useGroupedRecords } from './useGroupedRecords';
 
 type Props = {
   account: DropboxAccount;
@@ -37,7 +39,7 @@ function EmptyState() {
 }
 
 export function Connected({ account, onDisconnect }: Props) {
-  const [tab, setTab] = useState<'browse' | 'flagged'>('browse');
+  const [tab, setTab] = useState<'browse' | 'flagged' | 'groups'>('browse');
   const [active, setActive] = useState<Active | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [showGrouped, setShowGrouped] = useState(true);
@@ -48,7 +50,7 @@ export function Connected({ account, onDisconnect }: Props) {
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
-  const pendingTabRef = useRef<'browse' | 'flagged' | null>(null);
+  const pendingTabRef = useRef<'browse' | 'flagged' | 'groups' | null>(null);
 
   const [groups, setGroups] = useState<Group[]>([]);
 
@@ -57,6 +59,7 @@ export function Connected({ account, onDisconnect }: Props) {
   }, []);
 
   const cache = useThumbnailCache();
+  const { recordsByGroupId, reload: reloadGrouped, flush: flushGrouped, loading: groupedLoading } = useGroupedRecords();
   const { flags, groupIds, setFlag, removeFromGroup, clearAll, flush: flushBrowse, reload: reloadBrowse } = useCurationState(active?.path ?? null, active ? sortFiles(active.entries) : []);
   const visibleEntries = active
     ? (showGrouped
@@ -172,16 +175,15 @@ export function Connected({ account, onDisconnect }: Props) {
     <Tabs
       value={tab}
       onValueChange={async (next) => {
-        const target = next as 'browse' | 'flagged';
+        const target = next as 'browse' | 'flagged' | 'groups';
         if (target === tab || target === pendingTabRef.current) return;
         pendingTabRef.current = target;
-        if (target === 'flagged') {
-          await flushBrowse();
-          await reloadFlagged();
-        } else {
-          await flushFlagged();
-          await reloadBrowse();
-        }
+        if (tab === 'browse') await flushBrowse();
+        if (tab === 'flagged') await flushFlagged();
+        if (tab === 'groups') await flushGrouped();
+        if (target === 'flagged') await reloadFlagged();
+        if (target === 'browse') await reloadBrowse();
+        if (target === 'groups') await reloadGrouped();
         pendingTabRef.current = null;
         setTab(target);
       }}
@@ -206,6 +208,12 @@ export function Connected({ account, onDisconnect }: Props) {
             className="h-full! items-center! rounded-none border-0! border-b-2! border-transparent px-4 text-sm font-medium shadow-none! bg-transparent! text-nord-4! hover:text-nord-6! hover:bg-nord-2! focus-visible:ring-0! focus-visible:outline-hidden after:hidden data-[state=active]:border-nord-8! data-[state=active]:text-nord-6! data-[state=active]:bg-transparent! data-[state=active]:hover:bg-nord-2! transition-colors -mb-px"
           >
             Flagged
+          </TabsTrigger>
+          <TabsTrigger
+            value="groups"
+            className="h-full! items-center! rounded-none border-0! border-b-2! border-transparent px-4 text-sm font-medium shadow-none! bg-transparent! text-nord-4! hover:text-nord-6! hover:bg-nord-2! focus-visible:ring-0! focus-visible:outline-hidden after:hidden data-[state=active]:border-nord-8! data-[state=active]:text-nord-6! data-[state=active]:bg-transparent! data-[state=active]:hover:bg-nord-2! transition-colors -mb-px"
+          >
+            Groups
           </TabsTrigger>
         </TabsList>
         {confirmingDisconnect ? (
@@ -323,6 +331,19 @@ export function Connected({ account, onDisconnect }: Props) {
             onPreviewResize={handlePreviewResizeStart}
             email={account.email}
             onCreateGroup={handleCreateGroup}
+          />
+        </TabsContent>
+
+        <TabsContent
+          value="groups"
+          forceMount
+          className="flex-1 min-h-0 flex overflow-hidden data-[state=inactive]:hidden"
+        >
+          <GroupsView
+            groups={groups}
+            recordsByGroupId={recordsByGroupId}
+            cache={cache}
+            loading={groupedLoading}
           />
         </TabsContent>
       </main>

@@ -41,9 +41,22 @@ vi.mock('./curation', () => ({
   writeCuration: (...args: unknown[]) => mockWriteCuration(...args),
 }));
 
-vi.mock('./groups', () => ({
-  readGroups: vi.fn().mockResolvedValue([]),
-  createGroupAndPersist: vi.fn().mockResolvedValue({ id: 'g1', name: 'Test', lat: 0, lng: 0, photoIds: [] }),
+vi.mock('./groups', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./groups')>();
+  return {
+    ...actual,
+    readGroups: vi.fn().mockResolvedValue([]),
+    createGroupAndPersist: vi.fn().mockResolvedValue({ id: 'g1', name: 'Test', lat: 0, lng: 0, photoIds: [] }),
+  };
+});
+
+vi.mock('./useGroupedRecords', () => ({
+  useGroupedRecords: vi.fn(() => ({
+    recordsByGroupId: new Map(),
+    reload: vi.fn().mockResolvedValue(undefined),
+    flush: vi.fn().mockResolvedValue(undefined),
+    loading: false,
+  })),
 }));
 
 beforeAll(() => {
@@ -207,10 +220,11 @@ describe('Connected', () => {
 });
 
 describe('Connected > top tab bar', () => {
-  it('should render Browse and Flagged tabs in the header', () => {
+  it('should render Browse, Flagged, and Groups tabs in the header', () => {
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     expect(screen.getByRole('tab', { name: 'Browse' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Flagged' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Groups' })).toBeInTheDocument();
   });
 
   it('should default to the Browse tab on mount', () => {
@@ -311,7 +325,7 @@ describe('Connected > top tab bar', () => {
 
   it.each([
     { key: '{ArrowRight}', expectActive: 'Flagged', expectInactive: 'Browse' },
-    { key: '{ArrowLeft}', expectActive: 'Flagged', expectInactive: 'Browse' },
+    { key: '{ArrowLeft}', expectActive: 'Groups', expectInactive: 'Browse' },
   ])('should move tab selection with $key arrow key', async ({ key, expectActive, expectInactive }) => {
     const user = userEvent.setup();
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
