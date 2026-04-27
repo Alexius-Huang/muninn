@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { GroupCard } from './GroupCard';
+import { GroupDetailView } from './GroupDetailView';
 import { sortGroups, type GroupSort } from './groups';
 import type { Group } from './groups';
 import type { FlatRecord } from './useAllFlagged';
@@ -10,6 +11,10 @@ type Props = {
   recordsByGroupId: Map<string, FlatRecord[]>;
   cache: ThumbnailCache;
   loading: boolean;
+  isActive: boolean;
+  previewWidth: number;
+  isResizing?: boolean;
+  onPreviewResize: (e: React.MouseEvent) => void;
 };
 
 const SORT_LABELS: Record<GroupSort, string> = {
@@ -21,8 +26,37 @@ const SORT_LABELS: Record<GroupSort, string> = {
 
 const SORT_OPTIONS: GroupSort[] = ['newest', 'oldest', 'count', 'location'];
 
-export function GroupsView({ groups, recordsByGroupId, cache, loading }: Props) {
+export function GroupsView({
+  groups,
+  recordsByGroupId,
+  cache,
+  loading,
+  isActive,
+  previewWidth,
+  isResizing,
+  onPreviewResize,
+}: Props) {
   const [sort, setSort] = useState<GroupSort>('newest');
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+
+  const selectedGroup = selectedGroupId
+    ? (groups.find((g) => g.id === selectedGroupId) ?? null)
+    : null;
+
+  if (selectedGroup !== null) {
+    return (
+      <GroupDetailView
+        group={selectedGroup}
+        records={recordsByGroupId.get(selectedGroup.id) ?? []}
+        cache={cache}
+        isActive={isActive}
+        previewWidth={previewWidth}
+        isResizing={isResizing}
+        onPreviewResize={onPreviewResize}
+        onBack={() => setSelectedGroupId(null)}
+      />
+    );
+  }
 
   const sorted = sortGroups(groups, sort);
 
@@ -64,6 +98,7 @@ export function GroupsView({ groups, recordsByGroupId, cache, loading }: Props) 
                 group={group}
                 records={recordsByGroupId.get(group.id) ?? []}
                 cache={cache}
+                onSelect={setSelectedGroupId}
               />
             ))}
           </div>
