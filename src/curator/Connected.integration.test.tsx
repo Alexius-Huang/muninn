@@ -8,6 +8,8 @@ const mockDisconnect = vi.fn();
 const mockReadCuration = vi.fn();
 const mockWriteCuration = vi.fn();
 const mockListCuration = vi.fn();
+const mockReadGroups = vi.fn();
+const mockDeleteGroupAndCascade = vi.fn();
 
 vi.mock('../auth/dropboxAuth', () => ({
   disconnect: (...args: unknown[]) => mockDisconnect(...args),
@@ -29,6 +31,15 @@ vi.mock('./curation', () => ({
   listCuration: (...args: unknown[]) => mockListCuration(...args),
   migrateToIdKeys: vi.fn(() => ({ changed: false, file: { folderPath: '', records: {} }, droppedCount: 0 })),
 }));
+
+vi.mock('./groups', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./groups')>();
+  return {
+    ...actual,
+    readGroups: (...args: unknown[]) => mockReadGroups(...args),
+    deleteGroupAndCascade: (...args: unknown[]) => mockDeleteGroupAndCascade(...args),
+  };
+});
 
 beforeAll(() => {
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
@@ -69,7 +80,65 @@ beforeEach(() => {
   mockWriteCuration.mockResolvedValue(undefined);
   mockListCuration.mockReset();
   mockListCuration.mockResolvedValue([]);
+  mockReadGroups.mockReset();
+  mockReadGroups.mockResolvedValue([]);
+  mockDeleteGroupAndCascade.mockReset();
+  mockDeleteGroupAndCascade.mockResolvedValue(undefined);
   vi.spyOn(window, 'confirm').mockReturnValue(true);
+});
+
+describe('Connected > delete group cascade (MUN-37)', () => {
+  it('should invoke deleteGroupAndCascade, re-fetch groups, and remove the group from the list', async () => {
+    const user = userEvent.setup();
+
+    const group = {
+      id: 'g1',
+      name: 'Eiffel Tower',
+      lat: 48.858,
+      lng: 2.294,
+      placeId: 'p1',
+      locationName: 'Paris, France',
+      photoIds: ['id-a'],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    };
+
+    // First call: group exists; second call (after delete): empty list
+    mockReadGroups
+      .mockResolvedValueOnce([group])
+      .mockResolvedValue([]);
+    mockListCuration.mockResolvedValue([]);
+
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+
+    // Navigate to the Groups tab
+    await user.click(screen.getByRole('tab', { name: 'Groups' }));
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: 'Groups' })).toHaveAttribute('aria-selected', 'true'),
+    );
+
+    // Wait for the group card to appear
+    await waitFor(() => expect(screen.getByRole('article', { name: 'Eiffel Tower' })).toBeInTheDocument());
+
+    // Click the trash icon on the card
+    await user.click(screen.getByRole('button', { name: 'Delete group "Eiffel Tower"' }));
+
+    // Confirmation modal should be visible
+    expect(screen.getByText('Delete "Eiffel Tower"?')).toBeInTheDocument();
+
+    // Confirm the deletion
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    // deleteGroupAndCascade was called with the correct id
+    await waitFor(() => expect(mockDeleteGroupAndCascade).toHaveBeenCalledWith('g1'));
+
+    // Groups list re-fetched (once on mount, once after delete)
+    await waitFor(() => expect(mockReadGroups).toHaveBeenCalledTimes(2));
+
+    // The deleted group no longer appears
+    await waitFor(() =>
+      expect(screen.queryByRole('article', { name: 'Eiffel Tower' })).not.toBeInTheDocument(),
+    );
+  });
 });
 
 describe('Connected > tab-switch staleness regression (MUN-33)', () => {

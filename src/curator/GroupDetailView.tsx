@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Trash2 } from 'lucide-react';
 import { FlaggedGrid } from './FlaggedGrid';
 import { PreviewPanel } from './PreviewPanel';
 import type { GroupInfo, NavigateDirection } from './PreviewPanel';
@@ -17,6 +17,7 @@ type Props = {
   isResizing?: boolean;
   onPreviewResize: (e: React.MouseEvent) => void;
   onBack: () => void;
+  onDelete: (group: Group) => void;
 };
 
 export function GroupDetailView({
@@ -28,6 +29,7 @@ export function GroupDetailView({
   isResizing = false,
   onPreviewResize,
   onBack,
+  onDelete,
 }: Props) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [columns, setColumns] = useState(4);
@@ -89,6 +91,17 @@ export function GroupDetailView({
           <p className="text-nord-4 text-xs truncate">
             {count} {count === 1 ? 'photo' : 'photos'} · {locationLabel}
           </p>
+        </div>
+        <div className="ml-auto">
+          <button
+            type="button"
+            onClick={() => onDelete(group)}
+            aria-label={`Delete group "${group.name}"`}
+            className="flex items-center gap-1 px-2 py-1 rounded text-nord-4 hover:text-nord-11 hover:bg-nord-3 transition-colors text-sm"
+          >
+            <Trash2 size={14} />
+            Delete
+          </button>
         </div>
       </div>
 

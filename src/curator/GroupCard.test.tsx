@@ -107,4 +107,57 @@ describe('GroupCard', () => {
     await user.click(screen.getByRole('article'));
     expect(onSelect).toHaveBeenCalledWith('g1');
   });
+
+  it('should render the trash button with correct aria-label when onDelete is provided', () => {
+    const cache = makeCache();
+    render(
+      <GroupCard
+        group={makeGroup()}
+        records={[makeRecord('a')]}
+        cache={cache}
+        onDelete={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Delete group "Eiffel Tower"' }),
+    ).toBeInTheDocument();
+  });
+
+  it('should call onDelete(group) and NOT call onSelect when trash button is clicked', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const onDelete = vi.fn();
+    const group = makeGroup();
+    const cache = makeCache();
+    render(
+      <GroupCard
+        group={group}
+        records={[makeRecord('a')]}
+        cache={cache}
+        onSelect={onSelect}
+        onDelete={onDelete}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Delete group "Eiffel Tower"' }));
+    expect(onDelete).toHaveBeenCalledWith(group);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('should still call onSelect when clicking the card body (not the trash button)', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const cache = makeCache();
+    render(
+      <GroupCard
+        group={makeGroup()}
+        records={[makeRecord('a')]}
+        cache={cache}
+        onSelect={onSelect}
+        onDelete={vi.fn()}
+      />,
+    );
+    // Click the mosaic area (which doesn't have a role — click the article)
+    await user.click(screen.getByText('Eiffel Tower'));
+    expect(onSelect).toHaveBeenCalledWith('g1');
+  });
 });

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { GroupCard } from './GroupCard';
 import { GroupDetailView } from './GroupDetailView';
+import { DeleteGroupModal } from './DeleteGroupModal';
 import { sortGroups, type GroupSort } from './groups';
 import type { Group } from './groups';
 import type { FlatRecord } from './useAllFlagged';
@@ -15,6 +16,7 @@ type Props = {
   previewWidth: number;
   isResizing?: boolean;
   onPreviewResize: (e: React.MouseEvent) => void;
+  onDeleteGroup: (id: string) => Promise<void>;
 };
 
 const SORT_LABELS: Record<GroupSort, string> = {
@@ -35,9 +37,17 @@ export function GroupsView({
   previewWidth,
   isResizing,
   onPreviewResize,
+  onDeleteGroup,
 }: Props) {
   const [sort, setSort] = useState<GroupSort>('newest');
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
+
+  async function handleConfirmDelete(id: string) {
+    await onDeleteGroup(id);
+    setGroupToDelete(null);
+    setSelectedGroupId(null);
+  }
 
   const selectedGroup = selectedGroupId
     ? (groups.find((g) => g.id === selectedGroupId) ?? null)
@@ -45,22 +55,33 @@ export function GroupsView({
 
   if (selectedGroup !== null) {
     return (
-      <GroupDetailView
-        group={selectedGroup}
-        records={recordsByGroupId.get(selectedGroup.id) ?? []}
-        cache={cache}
-        isActive={isActive}
-        previewWidth={previewWidth}
-        isResizing={isResizing}
-        onPreviewResize={onPreviewResize}
-        onBack={() => setSelectedGroupId(null)}
-      />
+      <>
+        <GroupDetailView
+          group={selectedGroup}
+          records={recordsByGroupId.get(selectedGroup.id) ?? []}
+          cache={cache}
+          isActive={isActive}
+          previewWidth={previewWidth}
+          isResizing={isResizing}
+          onPreviewResize={onPreviewResize}
+          onBack={() => setSelectedGroupId(null)}
+          onDelete={setGroupToDelete}
+        />
+        <DeleteGroupModal
+          open={groupToDelete !== null}
+          onOpenChange={(open) => { if (!open) setGroupToDelete(null); }}
+          group={groupToDelete}
+          photoCount={recordsByGroupId.get(groupToDelete?.id ?? '')?.length ?? 0}
+          onConfirm={handleConfirmDelete}
+        />
+      </>
     );
   }
 
   const sorted = sortGroups(groups, sort);
 
   return (
+    <>
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="shrink-0 px-6 pt-4 pb-3 bg-nord-0 border-b border-nord-3 flex items-center gap-3">
         <span className="text-nord-4 text-sm">
@@ -99,11 +120,20 @@ export function GroupsView({
                 records={recordsByGroupId.get(group.id) ?? []}
                 cache={cache}
                 onSelect={setSelectedGroupId}
+                onDelete={setGroupToDelete}
               />
             ))}
           </div>
         )}
       </div>
     </div>
+    <DeleteGroupModal
+      open={groupToDelete !== null}
+      onOpenChange={(open) => { if (!open) setGroupToDelete(null); }}
+      group={groupToDelete}
+      photoCount={recordsByGroupId.get(groupToDelete?.id ?? '')?.length ?? 0}
+      onConfirm={handleConfirmDelete}
+    />
+    </>
   );
 }
