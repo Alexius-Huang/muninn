@@ -55,6 +55,7 @@ function renderDetail(overrides: {
   records?: FlatRecord[];
   isActive?: boolean;
   onBack?: () => void;
+  onDelete?: (group: Group) => void;
 } = {}) {
   return render(
     <GroupDetailView
@@ -65,6 +66,7 @@ function renderDetail(overrides: {
       previewWidth={480}
       onPreviewResize={vi.fn()}
       onBack={overrides.onBack ?? vi.fn()}
+      onDelete={overrides.onDelete ?? vi.fn()}
     />,
   );
 }
@@ -142,6 +144,22 @@ describe('GroupDetailView', () => {
     expect(screen.getByRole('button', { name: /close preview/i })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('button', { name: /close preview/i })).toBeNull();
+  });
+
+  it('should render the Delete button in the header with correct aria-label', () => {
+    renderDetail();
+    expect(
+      screen.getByRole('button', { name: 'Delete group "Eiffel Tower"' }),
+    ).toBeInTheDocument();
+  });
+
+  it('should call onDelete(group) when the Delete button is clicked', async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    const group = makeGroup();
+    renderDetail({ group, onDelete });
+    await user.click(screen.getByRole('button', { name: 'Delete group "Eiffel Tower"' }));
+    expect(onDelete).toHaveBeenCalledWith(group);
   });
 
   it.each([

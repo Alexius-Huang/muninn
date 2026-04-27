@@ -11,7 +11,7 @@ import { useCurationState } from './useCurationState';
 import { useAllFlagged } from './useAllFlagged';
 import { wrapIndex, jumpRow } from './navigate';
 import type { NavigateDirection } from './PreviewPanel';
-import { createGroupAndPersist, readGroups } from './groups';
+import { createGroupAndPersist, readGroups, deleteGroupAndCascade } from './groups';
 import type { Group } from './groups';
 import type { NominatimLocation } from '@/components/NominatimSearch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shadcn/tabs';
@@ -84,6 +84,15 @@ export function Connected({ account, onDisconnect }: Props) {
     });
     await assignGroupId(photos, group.id);
     readGroups().then(setGroups).catch(() => {});
+  }
+
+  async function handleDeleteGroup(id: string) {
+    await deleteGroupAndCascade(id);
+    await Promise.all([
+      readGroups().then(setGroups),
+      reloadGrouped(),
+      reloadFlagged(),
+    ]);
   }
 
   async function handleDisconnect() {
@@ -348,6 +357,7 @@ export function Connected({ account, onDisconnect }: Props) {
             previewWidth={previewWidth}
             isResizing={isDraggingPreview}
             onPreviewResize={handlePreviewResizeStart}
+            onDeleteGroup={handleDeleteGroup}
           />
         </TabsContent>
       </main>

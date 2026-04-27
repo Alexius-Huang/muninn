@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
+import { Trash2 } from 'lucide-react';
 import type { Group } from './groups';
 import type { FlatRecord } from './useAllFlagged';
 import type { ThumbnailCache } from './useThumbnailCache';
@@ -39,9 +40,10 @@ type Props = {
   records: FlatRecord[];
   cache: ThumbnailCache;
   onSelect?: (groupId: string) => void;
+  onDelete?: (group: Group) => void;
 };
 
-export function GroupCard({ group, records, cache, onSelect }: Props) {
+export function GroupCard({ group, records, cache, onSelect, onDelete }: Props) {
   const mosaicRecords = records.slice(0, 4);
   const count = records.length;
   const locationLabel = group.locationName ?? `${group.lat.toFixed(4)}, ${group.lng.toFixed(4)}`;
@@ -101,8 +103,18 @@ export function GroupCard({ group, records, cache, onSelect }: Props) {
       role="article"
       aria-label={group.name}
       onClick={() => onSelect?.(group.id)}
-      className="w-48 shrink-0 flex flex-col rounded-lg overflow-hidden bg-nord-1 border border-nord-3 cursor-pointer transition-colors hover:border-nord-8 hover:bg-nord-2"
+      className="group relative w-48 shrink-0 flex flex-col rounded-lg overflow-hidden bg-nord-1 border border-nord-3 cursor-pointer transition-colors hover:border-nord-8 hover:bg-nord-2"
     >
+      {onDelete && (
+        <button
+          type="button"
+          aria-label={`Delete group "${group.name}"`}
+          onClick={(e) => { e.stopPropagation(); onDelete(group); }}
+          className="absolute top-1.5 right-1.5 z-10 p-1 rounded bg-nord-0/70 text-nord-4 hover:text-nord-11 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
       <div className="w-full h-40 shrink-0">
         {mosaic}
       </div>
