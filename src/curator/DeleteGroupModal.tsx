@@ -19,20 +19,23 @@ type Props = {
 
 export function DeleteGroupModal({ open, onOpenChange, group, photoCount, onConfirm }: Props) {
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(false);
 
   function handleOpenChange(next: boolean) {
     if (submitting) return;
+    if (!next) setError(false);
     onOpenChange(next);
   }
 
   async function handleDelete() {
     if (!group || submitting) return;
     setSubmitting(true);
+    setError(false);
     try {
       await onConfirm(group.id);
       onOpenChange(false);
     } catch {
-      // keep modal open for retry
+      setError(true);
     } finally {
       setSubmitting(false);
     }
@@ -47,6 +50,9 @@ export function DeleteGroupModal({ open, onOpenChange, group, photoCount, onConf
             The {photoCount} {photoCount === 1 ? 'photo' : 'photos'} will return to unprocessed state.
           </DialogDescription>
         </DialogHeader>
+        {error && (
+          <p className="text-sm text-nord-11">Delete failed. Please try again.</p>
+        )}
         <DialogFooter>
           <button
             type="button"

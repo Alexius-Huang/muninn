@@ -77,7 +77,7 @@ describe('DeleteGroupModal', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('should keep the modal open when onConfirm rejects', async () => {
+  it('should keep the modal open and show an error when onConfirm rejects', async () => {
     const onConfirm = vi.fn().mockRejectedValue(new Error('cascade failed'));
     const onOpenChange = vi.fn();
     const user = userEvent.setup();
@@ -92,6 +92,7 @@ describe('DeleteGroupModal', () => {
     await waitFor(() => expect(onConfirm).toHaveBeenCalledOnce());
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.getByText('Delete failed. Please try again.')).toBeInTheDocument();
   });
 
   it('should disable both buttons while submitting', async () => {
