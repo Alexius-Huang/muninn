@@ -344,6 +344,10 @@ export function Connected({ account, onDisconnect }: Props) {
             recordsByGroupId={recordsByGroupId}
             cache={cache}
             loading={groupedLoading}
+            isActive={tab === 'groups'}
+            previewWidth={previewWidth}
+            isResizing={isDraggingPreview}
+            onPreviewResize={handlePreviewResizeStart}
           />
         </TabsContent>
       </main>

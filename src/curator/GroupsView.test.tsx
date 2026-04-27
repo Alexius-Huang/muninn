@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GroupsView } from './GroupsView';
@@ -40,6 +40,23 @@ function makeRecord(name: string, groupId: string): FlatRecord {
   };
 }
 
+const EXTRA_PROPS = {
+  isActive: false as boolean,
+  previewWidth: 480,
+  onPreviewResize: () => {},
+};
+
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get() { return 800; },
+  });
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+    width: 800, height: 1000, top: 0, left: 0, right: 800, bottom: 1000, x: 0, y: 0,
+    toJSON: () => {},
+  } as DOMRect);
+});
+
 describe('GroupsView', () => {
   it('should render empty-state copy when no groups exist', () => {
     render(
@@ -48,6 +65,7 @@ describe('GroupsView', () => {
         recordsByGroupId={new Map()}
         cache={makeCache()}
         loading={false}
+        {...EXTRA_PROPS}
       />,
     );
     expect(screen.getByText(/No groups yet/)).toBeTruthy();
@@ -64,6 +82,7 @@ describe('GroupsView', () => {
         recordsByGroupId={new Map()}
         cache={makeCache()}
         loading={false}
+        {...EXTRA_PROPS}
       />,
     );
     expect(screen.getByText('Eiffel Tower')).toBeTruthy();
@@ -77,6 +96,7 @@ describe('GroupsView', () => {
         recordsByGroupId={new Map()}
         cache={makeCache()}
         loading={true}
+        {...EXTRA_PROPS}
       />,
     );
     expect(screen.getByText('Loading…')).toBeTruthy();
@@ -98,6 +118,7 @@ describe('GroupsView', () => {
         recordsByGroupId={recordsByGroupId}
         cache={makeCache()}
         loading={false}
+        {...EXTRA_PROPS}
       />,
     );
 
@@ -117,5 +138,47 @@ describe('GroupsView', () => {
     const cardsByOldest = screen.getAllByRole('article');
     expect(cardsByOldest[0]).toHaveAttribute('aria-label', 'Alpha');
     expect(cardsByOldest[1]).toHaveAttribute('aria-label', 'Beta');
+  });
+
+  it('should switch to the detail view when a group card is clicked', async () => {
+    const user = userEvent.setup();
+    const group = makeGroup({ id: 'g1', name: 'Eiffel Tower', locationName: 'Paris, France' });
+    const recordsByGroupId = new Map([['g1', [makeRecord('a', 'g1')]]]);
+    render(
+      <GroupsView
+        groups={[group]}
+        recordsByGroupId={recordsByGroupId}
+        cache={makeCache()}
+        loading={false}
+        {...EXTRA_PROPS}
+      />,
+    );
+
+    await user.click(screen.getByRole('article', { name: 'Eiffel Tower' }));
+
+    expect(screen.getByRole('button', { name: /back to groups/i })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /sort groups/i })).toBeNull();
+  });
+
+  it('should return to the list view when the back button is clicked', async () => {
+    const user = userEvent.setup();
+    const group = makeGroup({ id: 'g1', name: 'Eiffel Tower', locationName: 'Paris, France' });
+    const recordsByGroupId = new Map([['g1', [makeRecord('a', 'g1')]]]);
+    render(
+      <GroupsView
+        groups={[group]}
+        recordsByGroupId={recordsByGroupId}
+        cache={makeCache()}
+        loading={false}
+        {...EXTRA_PROPS}
+      />,
+    );
+
+    await user.click(screen.getByRole('article', { name: 'Eiffel Tower' }));
+    expect(screen.getByRole('button', { name: /back to groups/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /back to groups/i }));
+    expect(screen.getByRole('combobox', { name: /sort groups/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /back to groups/i })).toBeNull();
   });
 });

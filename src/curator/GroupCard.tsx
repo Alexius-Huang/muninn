@@ -101,7 +101,7 @@ export function GroupCard({ group, records, cache, onSelect }: Props) {
       role="article"
       aria-label={group.name}
       onClick={() => onSelect?.(group.id)}
-      className="w-48 shrink-0 flex flex-col rounded-lg overflow-hidden bg-nord-1 border border-nord-3"
+      className="w-48 shrink-0 flex flex-col rounded-lg overflow-hidden bg-nord-1 border border-nord-3 cursor-pointer transition-colors hover:border-nord-8 hover:bg-nord-2"
     >
       <div className="w-full h-40 shrink-0">
         {mosaic}
