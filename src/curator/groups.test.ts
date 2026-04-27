@@ -4,11 +4,21 @@ const mockInvoke = vi.fn();
 vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => mockInvoke(...args) }));
 
 // groups.ts imports curation.ts which also imports @tauri-apps/api/core — mock covers both
-import { createGroup, updateGroup, deleteGroup, getGroup, listGroups, readGroups, writeGroups, createGroupAndPersist, deleteGroupAndCascade, type Group } from './groups';
+import { createGroup, updateGroup, deleteGroup, getGroup, listGroups, readGroups, writeGroups, createGroupAndPersist, deleteGroupAndCascade, sortGroups, type Group } from './groups';
 
 beforeEach(() => mockInvoke.mockReset());
 
 describe('createGroup', () => {
+  it('should stamp createdAt as an ISO timestamp within 1s of now', () => {
+    const before = Date.now();
+    const g = createGroup({ name: 'X', lat: 0, lng: 0 });
+    const after = Date.now();
+    expect(g.createdAt).toBeTruthy();
+    const ts = new Date(g.createdAt!).getTime();
+    expect(ts).toBeGreaterThanOrEqual(before);
+    expect(ts).toBeLessThanOrEqual(after + 1000);
+  });
+
   it('should generate a unique id and default photoIds to []', () => {
     const g1 = createGroup({ name: 'Eiffel Tower', lat: 48.858, lng: 2.294 });
     const g2 = createGroup({ name: 'Colosseum', lat: 41.89, lng: 12.492 });
@@ -167,6 +177,87 @@ describe('createGroupAndPersist', () => {
     expect(g1.id).toBeTruthy();
     expect(g2.id).toBeTruthy();
     expect(g1.id).not.toBe(g2.id);
+  });
+});
+
+describe('sortGroups', () => {
+  const makeGroup = (overrides: Partial<Group> & { id: string }): Group => ({
+    name: overrides.id,
+    lat: 0,
+    lng: 0,
+    photoIds: [],
+    ...overrides,
+  });
+
+  it('should sort newest first by createdAt', () => {
+    const groups = [
+      makeGroup({ id: 'a', createdAt: '2026-01-01T00:00:00.000Z' }),
+      makeGroup({ id: 'b', createdAt: '2026-03-01T00:00:00.000Z' }),
+      makeGroup({ id: 'c', createdAt: '2026-02-01T00:00:00.000Z' }),
+    ];
+    const result = sortGroups(groups, 'newest');
+    expect(result.map((g) => g.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('should sort oldest first by createdAt', () => {
+    const groups = [
+      makeGroup({ id: 'a', createdAt: '2026-01-01T00:00:00.000Z' }),
+      makeGroup({ id: 'b', createdAt: '2026-03-01T00:00:00.000Z' }),
+      makeGroup({ id: 'c', createdAt: '2026-02-01T00:00:00.000Z' }),
+    ];
+    const result = sortGroups(groups, 'oldest');
+    expect(result.map((g) => g.id)).toEqual(['a', 'c', 'b']);
+  });
+
+  it('should put groups missing createdAt at the end under newest', () => {
+    const groups = [
+      makeGroup({ id: 'a', createdAt: '2026-01-01T00:00:00.000Z' }),
+      makeGroup({ id: 'b' }),
+      makeGroup({ id: 'c', createdAt: '2026-03-01T00:00:00.000Z' }),
+    ];
+    const result = sortGroups(groups, 'newest');
+    expect(result.map((g) => g.id)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('should put groups missing createdAt at the end under oldest', () => {
+    const groups = [
+      makeGroup({ id: 'a', createdAt: '2026-03-01T00:00:00.000Z' }),
+      makeGroup({ id: 'b' }),
+      makeGroup({ id: 'c', createdAt: '2026-01-01T00:00:00.000Z' }),
+    ];
+    const result = sortGroups(groups, 'oldest');
+    expect(result.map((g) => g.id)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('should sort by photo count desc, breaking ties by name', () => {
+    const groups = [
+      makeGroup({ id: 'alpha', name: 'Alpha', photoIds: ['p1', 'p2'] }),
+      makeGroup({ id: 'beta', name: 'Beta', photoIds: ['p1', 'p2', 'p3'] }),
+      makeGroup({ id: 'gamma', name: 'Gamma', photoIds: ['p1', 'p2'] }),
+    ];
+    const result = sortGroups(groups, 'count');
+    expect(result.map((g) => g.id)).toEqual(['beta', 'alpha', 'gamma']);
+  });
+
+  it('should sort by location name, falling back to "lat,lng"', () => {
+    const groups = [
+      makeGroup({ id: 'a', locationName: 'Zurich', lat: 47.37, lng: 8.54 }),
+      makeGroup({ id: 'b', lat: 48.85, lng: 2.35 }),
+      makeGroup({ id: 'c', locationName: 'Amsterdam', lat: 52.37, lng: 4.9 }),
+    ];
+    const result = sortGroups(groups, 'location');
+    // '48.85,2.35' < 'Amsterdam' < 'Zurich' in localeCompare (numbers sort before letters)
+    expect(result.map((g) => g.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('should not mutate the input array', () => {
+    const groups = [
+      makeGroup({ id: 'a', createdAt: '2026-01-01T00:00:00.000Z' }),
+      makeGroup({ id: 'b', createdAt: '2026-03-01T00:00:00.000Z' }),
+    ];
+    const original = [...groups];
+    sortGroups(groups, 'newest');
+    expect(groups).toEqual(original);
   });
 });
 
