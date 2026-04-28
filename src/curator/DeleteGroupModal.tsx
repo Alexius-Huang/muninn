@@ -8,6 +8,7 @@ import {
   DialogFooter,
 } from '@/components/shadcn/dialog';
 import type { Group } from './groups';
+import { Button } from '@/components/shadcn/button';
 
 type Props = {
   open: boolean;
@@ -54,22 +55,22 @@ export function DeleteGroupModal({ open, onOpenChange, group, photoCount, onConf
           <p className="text-sm text-nord-11">Delete failed. Please try again.</p>
         )}
         <DialogFooter>
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => handleOpenChange(false)}
             disabled={submitting}
-            className="px-4 py-2 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="destructive"
             onClick={handleDelete}
             disabled={submitting}
-            className="px-4 py-2 rounded-lg bg-nord-11 text-white hover:bg-red-600 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {submitting ? 'Deleting…' : 'Delete'}
-          </button>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

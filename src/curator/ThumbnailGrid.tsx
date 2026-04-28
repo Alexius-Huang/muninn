@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/shadcn/dialog';
+import { Button } from '@/components/shadcn/button';
 
 const CELL_SIZE = 160;
 const LABEL_HEIGHT = 20;
@@ -129,25 +130,26 @@ export function ThumbnailGrid({ path, entries, cache, flags, groupIds, showGroup
             {files.length} photos in {displayPath}
           </h2>
           {onToggleShowGrouped && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onToggleShowGrouped}
               aria-pressed={showGrouped ?? true}
-              className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                (showGrouped ?? true) ? 'bg-nord-2 text-nord-6' : 'text-nord-4 hover:bg-nord-1'
-              }`}
+              className={(showGrouped ?? true) ? 'bg-nord-2 text-nord-6' : ''}
             >
               Show grouped
-            </button>
+            </Button>
           )}
           {onClearAll && (
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setConfirmOpen(true)}
                 disabled={flagCount === 0}
-                className="px-3 py-1 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Clear All
-              </button>
+              </Button>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Clear all flags?</DialogTitle>
@@ -156,18 +158,15 @@ export function ThumbnailGrid({ path, entries, cache, flags, groupIds, showGroup
                   </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
-                  <button
-                    onClick={() => setConfirmOpen(false)}
-                    className="px-4 py-2 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
-                  >
+                  <Button variant="secondary" onClick={() => setConfirmOpen(false)}>
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="destructive"
                     onClick={() => { onClearAll(); setConfirmOpen(false); }}
-                    className="px-4 py-2 rounded-lg bg-nord-11 text-white hover:bg-red-600 transition-colors text-sm"
                   >
                     Clear All
-                  </button>
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

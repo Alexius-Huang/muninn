@@ -15,6 +15,7 @@ import { createGroupAndPersist, readGroups, deleteGroupAndCascade } from './grou
 import type { Group } from './groups';
 import type { NominatimLocation } from '@/components/NominatimSearch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shadcn/tabs';
+import { Button } from '@/components/shadcn/button';
 import { GroupsView } from './GroupsView';
 import { useGroupedRecords } from './useGroupedRecords';
 
@@ -228,27 +229,18 @@ export function Connected({ account, onDisconnect }: Props) {
         {confirmingDisconnect ? (
           <div className="flex items-center gap-2">
             <span className="text-nord-4 text-sm">Disconnect?</span>
-            <button
-              onClick={handleDisconnect}
-              className="px-3 py-1 rounded-lg bg-nord-11 text-white hover:bg-red-600 transition-colors text-sm"
-            >
+            <Button variant="destructive" size="sm" onClick={handleDisconnect}>
               Yes
-            </button>
-            <button
-              onClick={() => setConfirmingDisconnect(false)}
-              className="px-3 py-1 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
-            >
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setConfirmingDisconnect(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="flex items-center">
-            <button
-              onClick={handleDisconnect}
-              className="px-4 py-1.5 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
-            >
+            <Button variant="secondary" size="sm" onClick={handleDisconnect}>
               Disconnect
-            </button>
+            </Button>
           </div>
         )}
       </header>
