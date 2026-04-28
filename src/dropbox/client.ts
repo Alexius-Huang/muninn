@@ -126,71 +126,134 @@ export type ThumbnailResult =
   | { tag: 'success'; path_lower: string; dataUrl: string }
   | { tag: 'failure'; path_lower: string; reason: string };
 
-type RawThumbnailEntry =
-  | { '.tag': 'success'; metadata: { path_lower: string }; thumbnail: string }
-  | { '.tag': 'failure'; failure: { '.tag': string } };
-
-export async function getThumbnailBatch(paths: string[]): Promise<ThumbnailResult[]> {
-  if (paths.length > 25) {
-    throw new Error('getThumbnailBatch: max 25 paths per call');
-  }
-  let resp: Response;
-  try {
-    resp = await authFetch('https://content.dropboxapi.com/2/files/get_thumbnail_batch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        entries: paths.map((path) => ({ path, format: 'jpeg', size: 'w256h256', mode: 'strict' })),
-      }),
-    });
-  } catch (e) {
-    if (e instanceof DropboxRefreshError) throw e;
-    throw new DropboxNetworkError((e as Error).message);
-  }
-  if (!resp.ok) throw await parseError(resp);
-  const body = (await resp.json()) as { entries: RawThumbnailEntry[] };
-  return body.entries.map((entry, i) => {
-    if (entry['.tag'] === 'success') {
-      return {
-        tag: 'success' as const,
-        path_lower: entry.metadata.path_lower,
-        dataUrl: 'data:image/jpeg;base64,' + entry.thumbnail,
-      };
-    }
-    return {
-      tag: 'failure' as const,
-      path_lower: paths[i].toLowerCase(),
-      reason: entry.failure?.['.tag'] ?? 'unknown',
-    };
-  });
-}
-
-export async function getPreview(pathDisplay: string): Promise<string> {
-  let resp: Response;
-  try {
-    resp = await authFetch('https://content.dropboxapi.com/2/files/get_thumbnail_v2', {
-      method: 'POST',
-      headers: {
-        'Dropbox-API-Arg': JSON.stringify({
-          resource: { '.tag': 'path', path: pathDisplay },
-          format: 'jpeg',
-          size: 'w2048h1536',
-          mode: 'strict',
-        }),
-      },
-    });
-  } catch (e) {
-    if (e instanceof DropboxRefreshError) throw e;
-    throw new DropboxNetworkError((e as Error).message);
-  }
-  if (!resp.ok) throw await parseError(resp);
-  const blob = await resp.blob();
+function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = () => reject(new Error('Failed to read image data'));
     reader.readAsDataURL(blob);
   });
+}
+
+// Dropbox-API-Arg is an HTTP header; HTTP headers can't carry raw non-ASCII bytes.
+// Dropbox's own SDKs escape any character above 0x7E as \uXXXX so the header stays
+// pure ASCII while the parsed JSON still recovers the original Unicode value.
+function asciiEscapeJson(json: string): string {
+  return json.replace(/[\x7f-\uffff]/g, (c) =>
+    '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'),
+  );
+}
+
+// Cap concurrent thumbnail/preview HTTP requests. Without this, opening a folder of
+// 80+ photos burst-fires that many parallel requests at Dropbox and trips its per-user
+// rate limit (429). HTTP/2 multiplexing handles the throughput fine; this just smooths
+// the request rate. 16 is well under the ~84-burst threshold we observed empirically,
+// and the 429 retry below covers the rare overshoot. Shared with getPreview.
+const MAX_THUMBNAIL_CONCURRENCY = 16;
+let _thumbnailInFlight = 0;
+const _thumbnailQueue: (() => void)[] = [];
+
+function withThumbnailSlot<T>(fn: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const run = (): void => {
+      _thumbnailInFlight++;
+      fn().then(
+        (v) => {
+          _thumbnailInFlight--;
+          _thumbnailQueue.shift()?.();
+          resolve(v);
+        },
+        (e: unknown) => {
+          _thumbnailInFlight--;
+          _thumbnailQueue.shift()?.();
+          reject(e as Error);
+        },
+      );
+    };
+    if (_thumbnailInFlight < MAX_THUMBNAIL_CONCURRENCY) run();
+    else _thumbnailQueue.push(run);
+  });
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchThumbnailV2(path: string, size: 'w256h256' | 'w2048h1536'): Promise<Response> {
+  const arg = asciiEscapeJson(
+    JSON.stringify({
+      resource: { '.tag': 'path', path },
+      format: 'jpeg',
+      size,
+      mode: 'strict',
+    }),
+  );
+  const send = (): Promise<Response> =>
+    authFetch('https://content.dropboxapi.com/2/files/get_thumbnail_v2', {
+      method: 'POST',
+      headers: { 'Dropbox-API-Arg': arg },
+    });
+
+  return withThumbnailSlot(async () => {
+    let resp: Response;
+    try {
+      resp = await send();
+    } catch (e) {
+      if (e instanceof DropboxRefreshError) throw e;
+      throw new DropboxNetworkError((e as Error).message);
+    }
+    if (resp.status === 429) {
+      // Honor Retry-After (seconds), clamped so a hostile value can't stall us.
+      const retryAfterSec = Number(resp.headers.get('Retry-After')) || 1;
+      await sleep(Math.min(Math.max(retryAfterSec, 1), 5) * 1000);
+      try {
+        resp = await send();
+      } catch (e) {
+        if (e instanceof DropboxRefreshError) throw e;
+        throw new DropboxNetworkError((e as Error).message);
+      }
+    }
+    return resp;
+  });
+}
+
+async function getThumbnailOne(path: string): Promise<ThumbnailResult> {
+  const pathLower = path.toLowerCase();
+  try {
+    const resp = await fetchThumbnailV2(path, 'w256h256');
+    if (resp.ok) {
+      const blob = await resp.blob();
+      const dataUrl = await blobToDataUrl(blob);
+      return { tag: 'success', path_lower: pathLower, dataUrl };
+    }
+    // Any non-2xx becomes a per-file failure rather than throwing — one bad photo (or a
+    // transient 5xx / 429) must NOT abort sibling calls inside Promise.all.
+    let reason = `http_${resp.status}`;
+    try {
+      const body = (await resp.json()) as { error_summary?: string };
+      if (body.error_summary) reason = body.error_summary.split('/')[0];
+    } catch {
+      // not JSON; leave reason as http_<status>
+    }
+    return { tag: 'failure', path_lower: pathLower, reason };
+  } catch (e) {
+    if (e instanceof DropboxRefreshError) throw e; // refresh failed — let auth flow react
+    return { tag: 'failure', path_lower: pathLower, reason: 'network' };
+  }
+}
+
+export async function getThumbnailBatch(paths: string[]): Promise<ThumbnailResult[]> {
+  if (paths.length > 25) {
+    throw new Error('getThumbnailBatch: max 25 paths per call');
+  }
+  return Promise.all(paths.map((p) => getThumbnailOne(p)));
+}
+
+export async function getPreview(pathDisplay: string): Promise<string> {
+  const resp = await fetchThumbnailV2(pathDisplay, 'w2048h1536');
+  if (!resp.ok) throw await parseError(resp);
+  const blob = await resp.blob();
+  return blobToDataUrl(blob);
 }
 
 export async function listFolderAll(path: string): Promise<DropboxEntry[]> {
