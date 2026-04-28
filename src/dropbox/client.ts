@@ -147,9 +147,9 @@ function asciiEscapeJson(json: string): string {
 // Cap concurrent thumbnail/preview HTTP requests. Without this, opening a folder of
 // 80+ photos burst-fires that many parallel requests at Dropbox and trips its per-user
 // rate limit (429). HTTP/2 multiplexing handles the throughput fine; this just smooths
-// the request rate. 16 is well under the ~84-burst threshold we observed empirically,
+// the request rate. 24 is still under the ~84-burst threshold we observed empirically,
 // and the 429 retry below covers the rare overshoot. Shared with getPreview.
-const MAX_THUMBNAIL_CONCURRENCY = 16;
+const MAX_THUMBNAIL_CONCURRENCY = 24;
 let _thumbnailInFlight = 0;
 const _thumbnailQueue: (() => void)[] = [];
 
