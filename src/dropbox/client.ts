@@ -126,55 +126,24 @@ export type ThumbnailResult =
   | { tag: 'success'; path_lower: string; dataUrl: string }
   | { tag: 'failure'; path_lower: string; reason: string };
 
-type RawThumbnailEntry =
-  | { '.tag': 'success'; metadata: { path_lower: string }; thumbnail: string }
-  | { '.tag': 'failure'; failure: { '.tag': string } };
-
-export async function getThumbnailBatch(paths: string[]): Promise<ThumbnailResult[]> {
-  if (paths.length > 25) {
-    throw new Error('getThumbnailBatch: max 25 paths per call');
-  }
-  let resp: Response;
-  try {
-    resp = await authFetch('https://content.dropboxapi.com/2/files/get_thumbnail_batch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        entries: paths.map((path) => ({ path, format: 'jpeg', size: 'w256h256', mode: 'strict' })),
-      }),
-    });
-  } catch (e) {
-    if (e instanceof DropboxRefreshError) throw e;
-    throw new DropboxNetworkError((e as Error).message);
-  }
-  if (!resp.ok) throw await parseError(resp);
-  const body = (await resp.json()) as { entries: RawThumbnailEntry[] };
-  return body.entries.map((entry, i) => {
-    if (entry['.tag'] === 'success') {
-      return {
-        tag: 'success' as const,
-        path_lower: entry.metadata.path_lower,
-        dataUrl: 'data:image/jpeg;base64,' + entry.thumbnail,
-      };
-    }
-    return {
-      tag: 'failure' as const,
-      path_lower: paths[i].toLowerCase(),
-      reason: entry.failure?.['.tag'] ?? 'unknown',
-    };
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to read image data'));
+    reader.readAsDataURL(blob);
   });
 }
 
-export async function getPreview(pathDisplay: string): Promise<string> {
-  let resp: Response;
+async function fetchThumbnailV2(path: string, size: 'w256h256' | 'w2048h1536'): Promise<Response> {
   try {
-    resp = await authFetch('https://content.dropboxapi.com/2/files/get_thumbnail_v2', {
+    return await authFetch('https://content.dropboxapi.com/2/files/get_thumbnail_v2', {
       method: 'POST',
       headers: {
         'Dropbox-API-Arg': JSON.stringify({
-          resource: { '.tag': 'path', path: pathDisplay },
+          resource: { '.tag': 'path', path },
           format: 'jpeg',
-          size: 'w2048h1536',
+          size,
           mode: 'strict',
         }),
       },
@@ -183,14 +152,41 @@ export async function getPreview(pathDisplay: string): Promise<string> {
     if (e instanceof DropboxRefreshError) throw e;
     throw new DropboxNetworkError((e as Error).message);
   }
+}
+
+async function getThumbnailOne(path: string): Promise<ThumbnailResult> {
+  const pathLower = path.toLowerCase();
+  const resp = await fetchThumbnailV2(path, 'w256h256');
+  if (resp.status === 409) {
+    // Per-file Dropbox error (e.g. unsupported_extension, path/not_found) — surface as failure
+    // without aborting sibling calls in the batch.
+    let reason = 'unknown';
+    try {
+      const body = (await resp.json()) as { error_summary?: string };
+      if (body.error_summary) reason = body.error_summary.split('/')[0];
+    } catch {
+      // fall through with reason='unknown'
+    }
+    return { tag: 'failure', path_lower: pathLower, reason };
+  }
   if (!resp.ok) throw await parseError(resp);
   const blob = await resp.blob();
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Failed to read image data'));
-    reader.readAsDataURL(blob);
-  });
+  const dataUrl = await blobToDataUrl(blob);
+  return { tag: 'success', path_lower: pathLower, dataUrl };
+}
+
+export async function getThumbnailBatch(paths: string[]): Promise<ThumbnailResult[]> {
+  if (paths.length > 25) {
+    throw new Error('getThumbnailBatch: max 25 paths per call');
+  }
+  return Promise.all(paths.map((p) => getThumbnailOne(p)));
+}
+
+export async function getPreview(pathDisplay: string): Promise<string> {
+  const resp = await fetchThumbnailV2(pathDisplay, 'w2048h1536');
+  if (!resp.ok) throw await parseError(resp);
+  const blob = await resp.blob();
+  return blobToDataUrl(blob);
 }
 
 export async function listFolderAll(path: string): Promise<DropboxEntry[]> {

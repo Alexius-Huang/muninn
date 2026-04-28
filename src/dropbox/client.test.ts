@@ -179,32 +179,44 @@ describe('listFolderAll', () => {
 });
 
 describe('getThumbnailBatch', () => {
-  it('should POST to content.dropboxapi.com/2/files/get_thumbnail_batch with correct entry shape', async () => {
-    mockAuthFetch.mockResolvedValue(
-      makeResponse(200, { entries: [{ '.tag': 'success', metadata: { path_lower: '/photos/img.jpg' }, thumbnail: 'abc123' }] }),
-    );
-    await getThumbnailBatch(['/Photos/img.jpg']);
-    const [url, init] = mockAuthFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://content.dropboxapi.com/2/files/get_thumbnail_batch');
-    const body = JSON.parse(init.body as string);
-    expect(body.entries).toHaveLength(1);
-    expect(body.entries[0]).toMatchObject({ path: '/Photos/img.jpg', format: 'jpeg', size: 'w256h256', mode: 'strict' });
+  function makeBinaryResponse(status: number, bytes: Uint8Array): Response {
+    const blob = new Blob([bytes as BlobPart], { type: 'image/jpeg' });
+    return {
+      status,
+      ok: status >= 200 && status < 300,
+      blob: () => Promise.resolve(blob),
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(''),
+    } as unknown as Response;
+  }
+
+  it('should POST to files/get_thumbnail_v2 once per path with the expected Dropbox-API-Arg', async () => {
+    mockAuthFetch.mockResolvedValue(makeBinaryResponse(200, new Uint8Array([0xff, 0xd8])));
+    await getThumbnailBatch(['/Photos/a.jpg', '/Photos/b.jpg']);
+    expect(mockAuthFetch).toHaveBeenCalledTimes(2);
+    for (const call of mockAuthFetch.mock.calls as [string, RequestInit][]) {
+      const [url, init] = call;
+      expect(url).toBe('https://content.dropboxapi.com/2/files/get_thumbnail_v2');
+      const arg = JSON.parse((init.headers as Record<string, string>)['Dropbox-API-Arg']);
+      expect(arg).toMatchObject({ format: 'jpeg', size: 'w256h256', mode: 'strict' });
+      expect(arg.resource['.tag']).toBe('path');
+    }
   });
 
-  it('should map success entries to { tag: "success", path_lower, dataUrl }', async () => {
-    mockAuthFetch.mockResolvedValue(
-      makeResponse(200, { entries: [{ '.tag': 'success', metadata: { path_lower: '/photos/img.jpg' }, thumbnail: 'base64data' }] }),
-    );
-    const results = await getThumbnailBatch(['/Photos/img.jpg']);
-    expect(results[0]).toEqual({ tag: 'success', path_lower: '/photos/img.jpg', dataUrl: 'data:image/jpeg;base64,base64data' });
+  it('should map 2xx blob responses to { tag: "success", path_lower, dataUrl }', async () => {
+    mockAuthFetch.mockResolvedValue(makeBinaryResponse(200, new Uint8Array([0xff, 0xd8])));
+    const [result] = await getThumbnailBatch(['/Photos/Img.jpg']);
+    expect(result).toMatchObject({ tag: 'success', path_lower: '/photos/img.jpg' });
+    expect((result as { dataUrl: string }).dataUrl).toMatch(/^data:image\/jpeg;base64,/);
   });
 
-  it('should map failure entries to { tag: "failure", path_lower, reason }', async () => {
-    mockAuthFetch.mockResolvedValue(
-      makeResponse(200, { entries: [{ '.tag': 'failure', failure: { '.tag': 'unsupported_extension' } }] }),
-    );
-    const results = await getThumbnailBatch(['/Photos/RAW.cr2']);
+  it('should map 409 per-file errors to { tag: "failure", path_lower, reason } without aborting siblings', async () => {
+    mockAuthFetch
+      .mockResolvedValueOnce(makeResponse(409, { error_summary: 'unsupported_extension/...' }))
+      .mockResolvedValueOnce(makeBinaryResponse(200, new Uint8Array([0xff, 0xd8])));
+    const results = await getThumbnailBatch(['/Photos/RAW.cr2', '/Photos/img.jpg']);
     expect(results[0]).toEqual({ tag: 'failure', path_lower: '/photos/raw.cr2', reason: 'unsupported_extension' });
+    expect(results[1]).toMatchObject({ tag: 'success', path_lower: '/photos/img.jpg' });
   });
 
   it('should throw DropboxAuthError on 401', async () => {
@@ -212,11 +224,11 @@ describe('getThumbnailBatch', () => {
     await expect(getThumbnailBatch(['/a.jpg'])).rejects.toThrow(DropboxAuthError);
   });
 
-  it('should throw DropboxApiError with error_summary on non-2xx non-401', async () => {
-    mockAuthFetch.mockResolvedValue(makeResponse(409, { error_summary: 'too_many_files/...' }));
+  it('should throw DropboxApiError on 5xx', async () => {
+    mockAuthFetch.mockResolvedValue(makeResponse(500, 'internal error'));
     const err = await getThumbnailBatch(['/a.jpg']).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(DropboxApiError);
-    expect((err as DropboxApiError).message).toContain('too_many_files');
+    expect((err as DropboxApiError).status).toBe(500);
   });
 
   it('should throw DropboxNetworkError when authFetch rejects', async () => {
