@@ -219,21 +219,68 @@ describe('getThumbnailBatch', () => {
     expect(results[1]).toMatchObject({ tag: 'success', path_lower: '/photos/img.jpg' });
   });
 
-  it('should throw DropboxAuthError on 401', async () => {
-    mockAuthFetch.mockResolvedValue(makeResponse(401, 'Unauthorized'));
-    await expect(getThumbnailBatch(['/a.jpg'])).rejects.toThrow(DropboxAuthError);
+  it('should map 401 to per-file failure rather than aborting the chunk', async () => {
+    mockAuthFetch
+      .mockResolvedValueOnce(makeResponse(401, 'Unauthorized'))
+      .mockResolvedValueOnce(makeBinaryResponse(200, new Uint8Array([0xff, 0xd8])));
+    const results = await getThumbnailBatch(['/a.jpg', '/b.jpg']);
+    expect(results[0]).toMatchObject({ tag: 'failure', path_lower: '/a.jpg', reason: 'http_401' });
+    expect(results[1]).toMatchObject({ tag: 'success', path_lower: '/b.jpg' });
   });
 
-  it('should throw DropboxApiError on 5xx', async () => {
-    mockAuthFetch.mockResolvedValue(makeResponse(500, 'internal error'));
-    const err = await getThumbnailBatch(['/a.jpg']).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(DropboxApiError);
-    expect((err as DropboxApiError).status).toBe(500);
+  it('should map 5xx to per-file failure rather than aborting the chunk', async () => {
+    mockAuthFetch
+      .mockResolvedValueOnce(makeResponse(500, 'internal error'))
+      .mockResolvedValueOnce(makeBinaryResponse(200, new Uint8Array([0xff, 0xd8])));
+    const results = await getThumbnailBatch(['/a.jpg', '/b.jpg']);
+    expect(results[0]).toMatchObject({ tag: 'failure', path_lower: '/a.jpg', reason: 'http_500' });
+    expect(results[1]).toMatchObject({ tag: 'success', path_lower: '/b.jpg' });
   });
 
-  it('should throw DropboxNetworkError when authFetch rejects', async () => {
-    mockAuthFetch.mockRejectedValue(new Error('Network down'));
-    await expect(getThumbnailBatch(['/a.jpg'])).rejects.toThrow(DropboxNetworkError);
+  it('should map network errors to per-file failure rather than aborting the chunk', async () => {
+    mockAuthFetch
+      .mockRejectedValueOnce(new Error('Network down'))
+      .mockResolvedValueOnce(makeBinaryResponse(200, new Uint8Array([0xff, 0xd8])));
+    const results = await getThumbnailBatch(['/a.jpg', '/b.jpg']);
+    expect(results[0]).toMatchObject({ tag: 'failure', path_lower: '/a.jpg', reason: 'network' });
+    expect(results[1]).toMatchObject({ tag: 'success', path_lower: '/b.jpg' });
+  });
+
+  it('should ASCII-escape non-ASCII characters in the Dropbox-API-Arg header', async () => {
+    mockAuthFetch.mockResolvedValue(makeBinaryResponse(200, new Uint8Array([0xff, 0xd8])));
+    await getThumbnailBatch(['/Photos/Großer Tiergarten/IMG.jpg']);
+    const [, init] = mockAuthFetch.mock.calls[0] as [string, RequestInit];
+    const argHeader = (init.headers as Record<string, string>)['Dropbox-API-Arg'];
+    // Header value must be pure ASCII — Dropbox requires \uXXXX escapes for any byte > 0x7e.
+    expect(argHeader).toMatch(/^[\x00-\x7e]*$/);
+    // …but the JSON-parsed payload still recovers the original Unicode path.
+    expect(JSON.parse(argHeader).resource.path).toBe('/Photos/Großer Tiergarten/IMG.jpg');
+  });
+
+  it('should retry once on 429 honoring Retry-After and succeed on the retry', async () => {
+    vi.useFakeTimers();
+    try {
+      const tooMany = {
+        status: 429,
+        ok: false,
+        headers: { get: (name: string) => (name === 'Retry-After' ? '1' : null) },
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(''),
+        blob: () => Promise.resolve(new Blob()),
+      } as unknown as Response;
+      mockAuthFetch
+        .mockResolvedValueOnce(tooMany)
+        .mockResolvedValueOnce(makeBinaryResponse(200, new Uint8Array([0xff, 0xd8])));
+
+      const pending = getThumbnailBatch(['/a.jpg']);
+      await vi.advanceTimersByTimeAsync(1500);
+      const [result] = await pending;
+
+      expect(result).toMatchObject({ tag: 'success', path_lower: '/a.jpg' });
+      expect(mockAuthFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('should throw synchronously when given more than 25 paths', async () => {
