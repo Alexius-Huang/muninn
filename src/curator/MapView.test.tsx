@@ -78,7 +78,7 @@ describe('MapView', () => {
     render(<MapView groups={[]} isActive={false} />);
     const container = screen.getByTestId('map-container');
     expect(JSON.parse(container.dataset.center!)).toEqual([20, 0]);
-    expect(Number(container.dataset.zoom)).toBe(2);
+    expect(Number(container.dataset.zoom)).toBe(4);
   });
 
   it('should call fitBounds when groups is non-empty', async () => {

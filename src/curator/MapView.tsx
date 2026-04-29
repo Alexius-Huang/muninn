@@ -34,7 +34,8 @@ export function MapView({ groups }: Props) {
     <div className="flex-1 min-h-0 relative">
       <MapContainer
         center={[20, 0]}
-        zoom={2}
+        zoom={4}
+        minZoom={4}
         style={{ height: '100%', width: '100%' }}
         className="muninn-map"
         attributionControl={false}
