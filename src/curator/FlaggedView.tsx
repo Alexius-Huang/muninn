@@ -16,6 +16,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/shadcn/dialog';
+import { Button } from '@/components/shadcn/button';
 
 type Filter = 'all' | 'keep' | 'discard';
 
@@ -94,34 +95,32 @@ export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cac
           {loading ? 'Loading…' : `${records.length} flagged`}
         </span>
         {(['all', 'keep', 'discard'] as Filter[]).map((f) => (
-          <button
+          <Button
             key={f}
+            variant="ghost"
+            size="sm"
             onClick={() => { setFilter(f); setSelectedIndex(null); }}
             aria-pressed={filter === f}
-            className={`px-3 py-1 rounded-lg text-sm capitalize transition-colors ${
-              filter === f ? 'bg-nord-2 text-nord-6' : 'text-nord-4 hover:bg-nord-1'
-            }`}
+            className={filter === f ? 'bg-nord-2 text-nord-6' : ''}
           >
             {f === 'all' ? 'All' : f === 'keep' ? 'Keep' : 'Discard'}
-          </button>
+          </Button>
         ))}
         {filter === 'keep' && filtered.length > 0 && (
-          <button
-            onClick={() => setCreateGroupOpen(true)}
-            className="px-3 py-1 rounded-lg bg-nord-9 text-white hover:bg-nord-10 transition-colors text-sm"
-          >
+          <Button size="sm" onClick={() => setCreateGroupOpen(true)}>
             Create Group
-          </button>
+          </Button>
         )}
         <div className="ml-auto">
           <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setConfirmOpen(true)}
               disabled={records.length === 0}
-              className="px-3 py-1 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Clear All
-            </button>
+            </Button>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Clear all flags?</DialogTitle>
@@ -130,18 +129,15 @@ export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cac
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <button
-                  onClick={() => setConfirmOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm"
-                >
+                <Button variant="secondary" onClick={() => setConfirmOpen(false)}>
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="destructive"
                   onClick={() => { clearAll(); setSelectedIndex(null); setConfirmOpen(false); }}
-                  className="px-4 py-2 rounded-lg bg-nord-11 text-white hover:bg-red-600 transition-colors text-sm"
                 >
                   Clear All
-                </button>
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

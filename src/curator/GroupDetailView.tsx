@@ -7,6 +7,7 @@ import type { Group } from './groups';
 import type { FlatRecord } from './useAllFlagged';
 import type { ThumbnailCache } from './useThumbnailCache';
 import { wrapIndex, jumpRow } from './navigate';
+import { Button } from '@/components/shadcn/button';
 
 type Props = {
   group: Group;
@@ -78,14 +79,16 @@ export function GroupDetailView({
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="shrink-0 px-4 pt-4 pb-3 bg-nord-0 border-b border-nord-3 flex items-center gap-3">
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onBack}
           aria-label="Back to groups"
-          className="flex items-center gap-1 px-2 py-1 rounded text-nord-4 hover:text-nord-6 hover:bg-nord-3 transition-colors text-sm shrink-0"
+          className="shrink-0 hover:bg-nord-3"
         >
           <ChevronLeft size={14} />
           Back
-        </button>
+        </Button>
         <div className="min-w-0">
           <p className="text-nord-6 text-sm font-semibold truncate">{group.name}</p>
           <p className="text-nord-4 text-xs truncate">
@@ -93,15 +96,17 @@ export function GroupDetailView({
           </p>
         </div>
         <div className="ml-auto">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => onDelete(group)}
             aria-label={`Delete group "${group.name}"`}
-            className="flex items-center gap-1 px-2 py-1 rounded text-nord-4 hover:text-nord-11 hover:bg-nord-3 transition-colors text-sm"
+            className="hover:text-nord-11 hover:bg-nord-3"
           >
             <Trash2 size={14} />
             Delete
-          </button>
+          </Button>
         </div>
       </div>
 

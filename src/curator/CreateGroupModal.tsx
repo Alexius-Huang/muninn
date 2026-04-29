@@ -10,6 +10,7 @@ import {
 import { NominatimSearch } from '@/components/NominatimSearch';
 import type { NominatimLocation } from '@/components/NominatimSearch';
 import { LocationMapPreview } from '@/components/LocationMapPreview';
+import { Button } from '@/components/shadcn/button';
 
 type Props = {
   open: boolean;
@@ -102,13 +103,15 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
             {selectedLocation ? (
               <div className="flex items-center justify-between rounded border border-nord-3 bg-nord-0 px-3 py-2">
                 <span className="text-sm text-nord-6 truncate">{selectedLocation.displayName}</span>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => { setSelectedLocation(null); setLocationStatus('idle'); setLocationError(null); }}
                   className="ml-2 shrink-0 text-xs text-nord-8 hover:text-nord-6"
                 >
                   Change
-                </button>
+                </Button>
               </div>
             ) : (
               <NominatimSearch
@@ -128,22 +131,21 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
         </div>
 
         <DialogFooter>
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => handleOpenChange(false)}
             disabled={submitting}
-            className="px-4 py-2 rounded-lg bg-nord-3 text-nord-5 hover:bg-nord-2 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleSubmit}
             disabled={!canCreate}
-            className="px-4 py-2 rounded-lg bg-nord-8 text-white hover:bg-nord-9 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {submitting ? 'Creating…' : 'Create'}
-          </button>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
