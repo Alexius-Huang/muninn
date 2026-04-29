@@ -19,7 +19,7 @@ function buildIconHtml(state: 'loading' | 'success' | 'error' | 'empty', dataUrl
 }
 
 function buildDivIcon(html: string): L.DivIcon {
-  return L.divIcon({ html, className: '', iconSize: [45, 61], iconAnchor: [22, 61] });
+  return L.divIcon({ html, className: '', iconSize: [60, 76], iconAnchor: [30, 76] });
 }
 
 export function createGroupPinMarker({ group, firstPhoto, cache }: CreateGroupPinArgs): GroupPinHandle {
@@ -27,8 +27,8 @@ export function createGroupPinMarker({ group, firstPhoto, cache }: CreateGroupPi
 
   marker.bindTooltip(group.name, {
     direction: 'top',
-    offset: [0, -36],
-    opacity: 0.95,
+    offset: [0, -82],
+    opacity: 1,
     className: 'muninn-pin-tooltip',
   });
 

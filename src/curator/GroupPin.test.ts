@@ -135,12 +135,12 @@ describe('createGroupPinMarker', () => {
     expect(lastSetIconArg.html).not.toContain('<img');
   });
 
-  it('should bind a tooltip with the group name, top direction, offset [0,-36], muninn-pin-tooltip className', () => {
+  it('should bind a tooltip with the group name, top direction, muninn-pin-tooltip className', () => {
     const group = makeGroup({ name: 'Paris 2024' });
     createGroupPinMarker({ group, firstPhoto: null, cache: makeCache() });
     expect(mockBindTooltip).toHaveBeenCalledWith(
       'Paris 2024',
-      { direction: 'top', offset: [0, -36], opacity: 0.95, className: 'muninn-pin-tooltip' },
+      { direction: 'top', offset: [0, -82], opacity: 1, className: 'muninn-pin-tooltip' },
     );
   });
 
