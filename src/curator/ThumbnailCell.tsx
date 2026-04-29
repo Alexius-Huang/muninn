@@ -72,7 +72,7 @@ export function ThumbnailCell({ file, state, flag, groupId, isActive = false, re
           <div
             data-testid="thumbnail-error"
             title={file.name}
-            className={`w-full h-full flex items-center justify-center${onRetry ? ' group' : ''}`}
+            className={`w-full h-full flex items-center justify-center${onRetry ? ' group transition-colors group-hover:bg-nord-3' : ''}`}
           >
             <AlertTriangle className={`h-5 w-5 text-red-500${onRetry ? ' group-hover:hidden' : ''}`} />
             {onRetry && <RefreshCw className="h-5 w-5 text-nord-4 hidden group-hover:block" />}
