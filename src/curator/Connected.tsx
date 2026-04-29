@@ -17,6 +17,7 @@ import type { NominatimLocation } from '@/components/NominatimSearch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shadcn/tabs';
 import { Button } from '@/components/shadcn/button';
 import { GroupsView } from './GroupsView';
+import { MapView } from './MapView';
 import { useGroupedRecords } from './useGroupedRecords';
 
 type Props = {
@@ -40,7 +41,7 @@ function EmptyState() {
 }
 
 export function Connected({ account, onDisconnect }: Props) {
-  const [tab, setTab] = useState<'browse' | 'flagged' | 'groups'>('browse');
+  const [tab, setTab] = useState<'browse' | 'flagged' | 'groups' | 'map'>('browse');
   const [active, setActive] = useState<Active | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [showGrouped, setShowGrouped] = useState(true);
@@ -51,7 +52,7 @@ export function Connected({ account, onDisconnect }: Props) {
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
-  const pendingTabRef = useRef<'browse' | 'flagged' | 'groups' | null>(null);
+  const pendingTabRef = useRef<'browse' | 'flagged' | 'groups' | 'map' | null>(null);
 
   const [groups, setGroups] = useState<Group[]>([]);
 
@@ -185,7 +186,7 @@ export function Connected({ account, onDisconnect }: Props) {
     <Tabs
       value={tab}
       onValueChange={async (next) => {
-        const target = next as 'browse' | 'flagged' | 'groups';
+        const target = next as 'browse' | 'flagged' | 'groups' | 'map';
         if (target === tab || target === pendingTabRef.current) return;
         pendingTabRef.current = target;
         if (tab === 'browse') await flushBrowse();
@@ -224,6 +225,12 @@ export function Connected({ account, onDisconnect }: Props) {
             className="h-full! items-center! rounded-none border-0! border-b-2! border-transparent px-4 text-sm font-medium shadow-none! bg-transparent! text-nord-4! hover:text-nord-6! hover:bg-nord-2! focus-visible:ring-0! focus-visible:outline-hidden after:hidden data-[state=active]:border-nord-8! data-[state=active]:text-nord-6! data-[state=active]:bg-transparent! data-[state=active]:hover:bg-nord-2! transition-colors -mb-px"
           >
             Groups
+          </TabsTrigger>
+          <TabsTrigger
+            value="map"
+            className="h-full! items-center! rounded-none border-0! border-b-2! border-transparent px-4 text-sm font-medium shadow-none! bg-transparent! text-nord-4! hover:text-nord-6! hover:bg-nord-2! focus-visible:ring-0! focus-visible:outline-hidden after:hidden data-[state=active]:border-nord-8! data-[state=active]:text-nord-6! data-[state=active]:bg-transparent! data-[state=active]:hover:bg-nord-2! transition-colors -mb-px"
+          >
+            Map
           </TabsTrigger>
         </TabsList>
         {confirmingDisconnect ? (
@@ -351,6 +358,13 @@ export function Connected({ account, onDisconnect }: Props) {
             onPreviewResize={handlePreviewResizeStart}
             onDeleteGroup={handleDeleteGroup}
           />
+        </TabsContent>
+
+        <TabsContent
+          value="map"
+          className="flex-1 min-h-0 flex overflow-hidden"
+        >
+          <MapView groups={groups} />
         </TabsContent>
       </main>
     </Tabs>
