@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, AlertTriangle, MapPin } from 'lucide-react';
+import { Loader2, AlertTriangle, MapPin, RefreshCw } from 'lucide-react';
 import type { DropboxFile } from '../dropbox/client';
 import type { ThumbnailState } from './store';
 import type { Flag } from './curation';
@@ -12,9 +12,10 @@ type Props = {
   isActive?: boolean;
   ref?: React.Ref<HTMLButtonElement>;
   onClick: () => void;
+  onRetry?: () => void;
 };
 
-export function ThumbnailCell({ file, state, flag, groupId, isActive = false, ref, onClick }: Props) {
+export function ThumbnailCell({ file, state, flag, groupId, isActive = false, ref, onClick, onRetry }: Props) {
   const [isLeaving, setIsLeaving] = useState(false);
   const prevActiveRef = useRef(isActive);
 
@@ -41,7 +42,7 @@ export function ThumbnailCell({ file, state, flag, groupId, isActive = false, re
     <button
       ref={ref}
       className="w-40 shrink-0 flex flex-col gap-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-nord-8"
-      onClick={onClick}
+      onClick={state.tag === 'error' && onRetry ? onRetry : onClick}
       aria-label={file.name}
       aria-current={isActive ? 'true' : undefined}
     >
@@ -71,9 +72,10 @@ export function ThumbnailCell({ file, state, flag, groupId, isActive = false, re
           <div
             data-testid="thumbnail-error"
             title={file.name}
-            className="w-full h-full flex items-center justify-center"
+            className={`w-full h-full flex items-center justify-center${onRetry ? ' group transition-colors group-hover:bg-nord-3' : ''}`}
           >
-            <AlertTriangle className="h-5 w-5 text-red-500" />
+            <AlertTriangle className={`h-5 w-5 text-red-500${onRetry ? ' group-hover:hidden' : ''}`} />
+            {onRetry && <RefreshCw className="h-5 w-5 text-nord-4 hidden group-hover:block" />}
           </div>
         )}
         <div

@@ -11,6 +11,8 @@ vi.mock('../dropbox/client', async (importOriginal) => {
   return {
     ...actual,
     getPreview: vi.fn().mockResolvedValue('data:image/jpeg;base64,preview'),
+    // keep thumbnails in loading state so tiles don't accidentally flip to error
+    getThumbnailBatch: vi.fn().mockReturnValue(new Promise(() => {})),
   };
 });
 

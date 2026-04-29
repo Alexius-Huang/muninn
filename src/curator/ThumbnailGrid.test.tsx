@@ -29,6 +29,7 @@ function makeMockCache(): ThumbnailCache {
     request: vi.fn().mockReturnValue({ tag: 'loading' }),
     subscribe: vi.fn().mockReturnValue(() => {}),
     peek: vi.fn().mockReturnValue({ tag: 'loading' }),
+    retry: vi.fn(),
   };
 }
 

@@ -86,6 +86,34 @@ describe('ThumbnailCell', () => {
     expect(screen.getByRole('button', { name: 'photo.jpg' })).not.toHaveAttribute('aria-current');
   });
 
+  it('should call onRetry (not onClick) when the error tile is clicked and onRetry is provided', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const onRetry = vi.fn();
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'error' }} onClick={onClick} onRetry={onRetry} />);
+    await user.click(screen.getByRole('button', { name: 'photo.jpg' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('should call onClick normally when the error tile is clicked but no onRetry is provided', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'error' }} onClick={onClick} />);
+    await user.click(screen.getByRole('button', { name: 'photo.jpg' }));
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it('should call onClick (not onRetry) when a success tile is clicked', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const onRetry = vi.fn();
+    render(<ThumbnailCell file={FAKE_FILE} state={{ tag: 'success', dataUrl: 'data:image/jpeg;base64,abc' }} onClick={onClick} onRetry={onRetry} />);
+    await user.click(screen.getByRole('button', { name: 'photo.jpg' }));
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
   it('should briefly show leaving state then clear it after 200 ms when isActive goes false', async () => {
     vi.useFakeTimers();
     const { rerender } = render(

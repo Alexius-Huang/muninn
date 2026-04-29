@@ -57,7 +57,7 @@ function ConnectedCell({
     }
   }, [isActive]);
 
-  return <ThumbnailCell ref={cellRef} file={file} state={state} flag={flag} groupId={groupId} isActive={isActive} onClick={onSelect} />;
+  return <ThumbnailCell ref={cellRef} file={file} state={state} flag={flag} groupId={groupId} isActive={isActive} onClick={onSelect} onRetry={() => cache.retry(file.path_lower)} />;
 }
 
 type Props = {

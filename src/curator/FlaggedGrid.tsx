@@ -45,7 +45,7 @@ function GridCell({ flat, cache, isActive, onSelect }: CellProps) {
     client_modified: '',
   };
 
-  return <ThumbnailCell ref={cellRef} file={file} state={state} flag={record.flag} isActive={isActive} onClick={onSelect} />;
+  return <ThumbnailCell ref={cellRef} file={file} state={state} flag={record.flag} isActive={isActive} onClick={onSelect} onRetry={() => cache.retry(record.pathLower)} />;
 }
 
 type Props = {
