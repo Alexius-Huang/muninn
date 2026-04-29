@@ -69,11 +69,11 @@ describe('createGroupPinMarker', () => {
     expect(L.divIcon).toHaveBeenCalledWith(expect.objectContaining({ className: '' }));
   });
 
-  it('should include a teardrop SVG path in the icon HTML', () => {
+  it('should include a triangle SVG in the icon HTML', () => {
     createGroupPinMarker({ group: makeGroup(), firstPhoto: null, cache: makeCache() });
     const call = (L.divIcon as ReturnType<typeof vi.fn>).mock.calls[0][0] as { html: string };
     expect(call.html).toContain('muninn-pin__tail');
-    expect(call.html).toContain('<path d=');
+    expect(call.html).toContain('<polygon');
   });
 
   it('should set data-state="empty" when firstPhoto is null', () => {

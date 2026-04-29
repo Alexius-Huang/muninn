@@ -15,11 +15,11 @@ export type GroupPinHandle = {
 
 function buildIconHtml(state: 'loading' | 'success' | 'error' | 'empty', dataUrl?: string): string {
   const imgHtml = state === 'success' && dataUrl ? `<img src="${dataUrl}" alt="" />` : '';
-  return `<div class="muninn-pin" data-state="${state}"><svg class="muninn-pin__tail" viewBox="0 0 48 60" aria-hidden="true"><path d="M24 0C10.745 0 0 10.745 0 24c0 18 24 36 24 36s24-18 24-36C48 10.745 37.255 0 24 0z" /></svg><div class="muninn-pin__head">${imgHtml}</div></div>`;
+  return `<div class="muninn-pin" data-state="${state}"><div class="muninn-pin__head">${imgHtml}</div><svg class="muninn-pin__tail" width="12" height="18" viewBox="0 0 12 18" aria-hidden="true"><polygon points="0,0 12,0 6,18" /></svg></div>`;
 }
 
 function buildDivIcon(html: string): L.DivIcon {
-  return L.divIcon({ html, className: '', iconSize: [48, 60], iconAnchor: [24, 60] });
+  return L.divIcon({ html, className: '', iconSize: [45, 61], iconAnchor: [22, 61] });
 }
 
 export function createGroupPinMarker({ group, firstPhoto, cache }: CreateGroupPinArgs): GroupPinHandle {

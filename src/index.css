@@ -79,8 +79,11 @@ html, body, #root {
 
 .muninn-pin {
   position: relative;
-  width: 48px;
-  height: 60px;
+  width: 45px;
+  height: 61px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   transition: transform 150ms ease-out;
   transform-origin: 50% 100%;
   cursor: pointer;
@@ -90,19 +93,29 @@ html, body, #root {
   .muninn-pin { transition: none; }
   .muninn-pin:hover { transform: none; }
 }
-.muninn-pin__tail { position: absolute; inset: 0; }
-.muninn-pin__tail path { fill: var(--color-nord-1); stroke: var(--color-nord-6); stroke-width: 1.5; }
 .muninn-pin__head {
-  position: absolute;
-  top: 4px; left: 50%;
-  width: 36px; height: 36px;
-  margin-left: -18px;
+  width: 45px;
+  height: 45px;
   border-radius: 9999px;
   overflow: hidden;
   background: var(--color-nord-2);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.3);
+  border: 2px solid var(--color-nord-6);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 .muninn-pin__head img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.muninn-pin__tail {
+  display: block;
+  margin-top: -2px;
+}
+.muninn-pin__tail polygon {
+  fill: var(--color-nord-1);
+  stroke: var(--color-nord-6);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
 .muninn-pin-tooltip {
   background: var(--color-nord-1);
   color: var(--color-nord-6);
