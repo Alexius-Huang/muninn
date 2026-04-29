@@ -99,7 +99,7 @@ html, body, #root {
   border-radius: 9999px;
   overflow: hidden;
   background: var(--color-nord-2);
-  border: 2px solid var(--color-nord-4);
+  border: 2px solid var(--color-nord-3);
   padding: 2px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.5);
   flex-shrink: 0;
@@ -113,7 +113,7 @@ html, body, #root {
 }
 .muninn-pin__tail polygon {
   fill: var(--color-nord-1);
-  stroke: var(--color-nord-4);
+  stroke: var(--color-nord-3);
   stroke-width: 1.5;
   stroke-linejoin: round;
 }

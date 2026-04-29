@@ -140,7 +140,7 @@ describe('createGroupPinMarker', () => {
     createGroupPinMarker({ group, firstPhoto: null, cache: makeCache() });
     expect(mockBindTooltip).toHaveBeenCalledWith(
       'Paris 2024',
-      { direction: 'top', offset: [0, -110], opacity: 1, className: 'muninn-pin-tooltip' },
+      { direction: 'top', offset: [0, -92], opacity: 1, className: 'muninn-pin-tooltip' },
     );
   });
 
