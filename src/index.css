@@ -117,8 +117,8 @@ html, body, #root {
   stroke-width: 1.5;
   stroke-linejoin: round;
 }
-.muninn-pin-tooltip {
-  background: var(--color-nord-10);
+.leaflet-tooltip.muninn-pin-tooltip {
+  background: var(--color-nord-1);
   color: var(--color-nord-6);
   border: none;
   border-radius: 4px;
@@ -126,6 +126,6 @@ html, body, #root {
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
 }
-.muninn-pin-tooltip::before { display: none; }
+.leaflet-tooltip.muninn-pin-tooltip::before { display: none; }

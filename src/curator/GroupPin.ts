@@ -27,7 +27,7 @@ export function createGroupPinMarker({ group, firstPhoto, cache }: CreateGroupPi
 
   marker.bindTooltip(group.name, {
     direction: 'top',
-    offset: [0, -82],
+    offset: [0, -110],
     opacity: 1,
     className: 'muninn-pin-tooltip',
   });
