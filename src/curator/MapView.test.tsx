@@ -9,16 +9,19 @@ vi.mock('react-leaflet', () => ({
   MapContainer: ({
     center,
     zoom,
+    attributionControl,
     children,
   }: {
     center: [number, number];
     zoom: number;
+    attributionControl?: boolean;
     children: React.ReactNode;
   }) => (
     <div
       data-testid="map-container"
       data-center={JSON.stringify(center)}
       data-zoom={String(zoom)}
+      data-attribution-control={String(attributionControl)}
     >
       {children}
     </div>
@@ -49,16 +52,16 @@ beforeEach(() => {
 });
 
 describe('MapView', () => {
-  it('should render the OSM tile layer with the OpenStreetMap URL', () => {
+  it('should render the dark CartoCDN tile layer', () => {
     render(<MapView groups={[]} isActive={false} />);
     const tileLayer = screen.getByTestId('tile-layer');
-    expect(tileLayer.dataset.url).toContain('tile.openstreetmap.org');
+    expect(tileLayer.dataset.url).toContain('cartocdn.com/dark_all');
   });
 
-  it('should render OSM attribution on the tile layer', () => {
+  it('should disable the attribution control on the map container', () => {
     render(<MapView groups={[]} isActive={false} />);
-    const tileLayer = screen.getByTestId('tile-layer');
-    expect(tileLayer.dataset.attribution).toContain('OpenStreetMap');
+    const container = screen.getByTestId('map-container');
+    expect(container.dataset.attributionControl).toBe('false');
   });
 
   it('should render the empty-state overlay when no groups are passed', () => {
