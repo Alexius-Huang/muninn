@@ -76,3 +76,40 @@ html, body, #root {
 .muninn-map.leaflet-container {
   background: #3b4252;
 }
+
+.muninn-pin {
+  position: relative;
+  width: 48px;
+  height: 60px;
+  transition: transform 150ms ease-out;
+  transform-origin: 50% 100%;
+  cursor: pointer;
+}
+.muninn-pin:hover { transform: scale(1.22); }
+@media (prefers-reduced-motion: reduce) {
+  .muninn-pin { transition: none; }
+  .muninn-pin:hover { transform: none; }
+}
+.muninn-pin__tail { position: absolute; inset: 0; }
+.muninn-pin__tail path { fill: var(--color-nord-1); stroke: var(--color-nord-6); stroke-width: 1.5; }
+.muninn-pin__head {
+  position: absolute;
+  top: 4px; left: 50%;
+  width: 36px; height: 36px;
+  margin-left: -18px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: var(--color-nord-2);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.3);
+}
+.muninn-pin__head img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.muninn-pin-tooltip {
+  background: var(--color-nord-1);
+  color: var(--color-nord-6);
+  border: 1px solid var(--color-nord-3);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.muninn-pin-tooltip::before { display: none; }

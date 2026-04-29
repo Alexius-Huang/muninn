@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import { useAppStore } from './store';
 import type { Group } from './groups';
+import { createGroupPinMarker } from './GroupPin';
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
 L.Icon.Default.mergeOptions({ iconUrl: markerIcon, iconRetinaUrl: markerIcon2x, shadowUrl: markerShadow });
@@ -36,14 +37,27 @@ function ResizeOnWindow() {
 
 function MarkerClusterLayer({ groups }: { groups: Group[] }) {
   const map = useMap();
+  const recordsByGroupId = useAppStore((s) => s.recordsByGroupId);
+  const cache = useAppStore((s) => s.cache);
+
   useEffect(() => {
     const clusterGroup = L.markerClusterGroup();
+    const cleanups: (() => void)[] = [];
+
     for (const group of groups) {
-      L.marker([group.lat, group.lng]).addTo(clusterGroup);
+      const firstPhoto = recordsByGroupId.get(group.id)?.[0] ?? null;
+      const { marker, cleanup } = createGroupPinMarker({ group, firstPhoto, cache });
+      clusterGroup.addLayer(marker);
+      cleanups.push(cleanup);
     }
+
     map.addLayer(clusterGroup);
-    return () => { map.removeLayer(clusterGroup); };
-  }, [map, groups]);
+    return () => {
+      for (const cleanup of cleanups) cleanup();
+      map.removeLayer(clusterGroup);
+    };
+  }, [map, groups, recordsByGroupId, cache]);
+
   return null;
 }
 

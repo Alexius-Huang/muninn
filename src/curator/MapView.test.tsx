@@ -9,6 +9,18 @@ const mockRemoveLayer = vi.fn();
 
 vi.mock('leaflet.markercluster', () => ({}));
 
+const { mockCreateGroupPinMarker, mockPinCleanup } = vi.hoisted(() => {
+  const mockPinCleanup = vi.fn();
+  const mockPinMarker = {
+    setIcon: vi.fn(),
+    bindTooltip: vi.fn().mockReturnThis(),
+  };
+  const mockCreateGroupPinMarker = vi.fn(() => ({ marker: mockPinMarker, cleanup: mockPinCleanup }));
+  return { mockCreateGroupPinMarker, mockPinCleanup, mockPinMarker };
+});
+
+vi.mock('./GroupPin', () => ({ createGroupPinMarker: mockCreateGroupPinMarker }));
+
 vi.mock('react-leaflet', () => ({
   MapContainer: ({
     center,
@@ -45,6 +57,7 @@ import L from 'leaflet';
 import { MapView } from './MapView';
 import { useAppStore, _resetStoreForTesting } from './store';
 import type { Group } from './groups';
+import type { FlatRecord } from './store';
 
 function makeGroup(overrides: Partial<Group> = {}): Group {
   return {
@@ -66,6 +79,8 @@ beforeEach(() => {
   mockRemoveLayer.mockReset();
   mockCluster = { addLayer: vi.fn() };
   (L as unknown as Record<string, unknown>).markerClusterGroup = vi.fn(() => mockCluster);
+  mockCreateGroupPinMarker.mockClear();
+  mockPinCleanup.mockClear();
   _resetStoreForTesting();
 });
 
@@ -176,5 +191,80 @@ describe('MapView', () => {
 
     expect(mockRemoveLayer).toHaveBeenCalledWith(mockCluster);
     expect(mockAddLayer).toHaveBeenCalledWith(newCluster);
+  });
+
+  it('should call createGroupPinMarker once per group, passing group, firstPhoto, and cache', async () => {
+    const groups = [makeGroup({ id: 'g1' }), makeGroup({ id: 'g2' })];
+    useAppStore.setState({ groups });
+    const { cache } = useAppStore.getState();
+    await act(async () => { render(<MapView />); });
+    expect(mockCreateGroupPinMarker).toHaveBeenCalledTimes(groups.length);
+    for (const group of groups) {
+      expect(mockCreateGroupPinMarker).toHaveBeenCalledWith({ group, firstPhoto: null, cache });
+    }
+  });
+
+  it('should pass null as firstPhoto when recordsByGroupId has no entry for a group', async () => {
+    const group = makeGroup({ id: 'g1' });
+    useAppStore.setState({ groups: [group], recordsByGroupId: new Map() });
+    await act(async () => { render(<MapView />); });
+    expect(mockCreateGroupPinMarker).toHaveBeenCalledWith(
+      expect.objectContaining({ firstPhoto: null }),
+    );
+  });
+
+  it('should pass the first FlatRecord from recordsByGroupId when records exist', async () => {
+    const group = makeGroup({ id: 'g1' });
+    const photo: FlatRecord = {
+      folderPath: '/Photos',
+      key: 'id:abc',
+      record: { pathLower: '/photos/a.jpg', pathDisplay: '/Photos/a.jpg', name: 'a.jpg' },
+    };
+    const extra: FlatRecord = {
+      folderPath: '/Photos',
+      key: 'id:xyz',
+      record: { pathLower: '/photos/b.jpg', pathDisplay: '/Photos/b.jpg', name: 'b.jpg' },
+    };
+    useAppStore.setState({
+      groups: [group],
+      recordsByGroupId: new Map([['g1', [photo, extra]]]),
+    });
+    await act(async () => { render(<MapView />); });
+    expect(mockCreateGroupPinMarker).toHaveBeenCalledWith(
+      expect.objectContaining({ firstPhoto: photo }),
+    );
+  });
+
+  it('should add each created marker to the cluster group', async () => {
+    const groups = [makeGroup({ id: 'g1' }), makeGroup({ id: 'g2' })];
+    useAppStore.setState({ groups });
+    await act(async () => { render(<MapView />); });
+    expect(mockCluster.addLayer).toHaveBeenCalledTimes(groups.length);
+    for (const result of mockCreateGroupPinMarker.mock.results) {
+      expect(mockCluster.addLayer).toHaveBeenCalledWith(
+        (result as { value: { marker: unknown } }).value.marker,
+      );
+    }
+  });
+
+  it('should run all per-pin cleanups when groups change', async () => {
+    useAppStore.setState({ groups: [makeGroup({ id: 'g1' }), makeGroup({ id: 'g2' })] });
+    await act(async () => { render(<MapView />); });
+    expect(mockPinCleanup).not.toHaveBeenCalled();
+
+    await act(async () => {
+      useAppStore.setState({ groups: [makeGroup({ id: 'g3' })] });
+    });
+
+    expect(mockPinCleanup).toHaveBeenCalledTimes(2);
+  });
+
+  it('should run all per-pin cleanups on unmount', async () => {
+    useAppStore.setState({ groups: [makeGroup(), makeGroup()] });
+    let unmount!: () => void;
+    await act(async () => { ({ unmount } = render(<MapView />)); });
+    expect(mockPinCleanup).not.toHaveBeenCalled();
+    await act(async () => { unmount(); });
+    expect(mockPinCleanup).toHaveBeenCalledTimes(2);
   });
 });
