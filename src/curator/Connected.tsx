@@ -364,7 +364,7 @@ export function Connected({ account, onDisconnect }: Props) {
           value="map"
           className="flex-1 min-h-0 flex overflow-hidden"
         >
-          <MapView groups={groups} isActive={tab === 'map'} />
+          <MapView groups={groups} />
         </TabsContent>
       </main>
     </Tabs>

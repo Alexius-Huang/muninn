@@ -6,7 +6,6 @@ import type { Group } from './groups';
 
 type Props = {
   groups: Group[];
-  isActive: boolean;
 };
 
 function FitBounds({ groups }: { groups: Group[] }) {

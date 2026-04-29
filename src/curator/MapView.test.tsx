@@ -53,29 +53,29 @@ beforeEach(() => {
 
 describe('MapView', () => {
   it('should render the dark CartoCDN tile layer', () => {
-    render(<MapView groups={[]} isActive={false} />);
+    render(<MapView groups={[]}  />);
     const tileLayer = screen.getByTestId('tile-layer');
     expect(tileLayer.dataset.url).toContain('cartocdn.com/dark_all');
   });
 
   it('should disable the attribution control on the map container', () => {
-    render(<MapView groups={[]} isActive={false} />);
+    render(<MapView groups={[]}  />);
     const container = screen.getByTestId('map-container');
     expect(container.dataset.attributionControl).toBe('false');
   });
 
   it('should render the empty-state overlay when no groups are passed', () => {
-    render(<MapView groups={[]} isActive={false} />);
+    render(<MapView groups={[]}  />);
     expect(screen.getByText(/no groups yet/i)).toBeInTheDocument();
   });
 
   it('should not render the empty-state overlay when groups are passed', () => {
-    render(<MapView groups={[makeGroup()]} isActive={true} />);
+    render(<MapView groups={[makeGroup()]}  />);
     expect(screen.queryByText(/no groups yet/i)).not.toBeInTheDocument();
   });
 
   it('should center the map at world default when groups is empty', () => {
-    render(<MapView groups={[]} isActive={false} />);
+    render(<MapView groups={[]}  />);
     const container = screen.getByTestId('map-container');
     expect(JSON.parse(container.dataset.center!)).toEqual([20, 0]);
     expect(Number(container.dataset.zoom)).toBe(4);
@@ -87,7 +87,7 @@ describe('MapView', () => {
       makeGroup({ id: 'g2', lat: 45.764, lng: 4.834 }),
     ];
     await act(async () => {
-      render(<MapView groups={groups} isActive={true} />);
+      render(<MapView groups={groups}  />);
     });
     expect(mockFitBounds).toHaveBeenCalledOnce();
     expect(mockFitBounds).toHaveBeenCalledWith(
@@ -98,7 +98,7 @@ describe('MapView', () => {
 
   it('should not call fitBounds when groups is empty', async () => {
     await act(async () => {
-      render(<MapView groups={[]} isActive={false} />);
+      render(<MapView groups={[]}  />);
     });
     expect(mockFitBounds).not.toHaveBeenCalled();
   });
