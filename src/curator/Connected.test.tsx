@@ -14,6 +14,14 @@ const mockListCuration = vi.fn();
 const mockWriteCuration = vi.fn();
 let mockFlaggedRecords: unknown[] = [];
 
+vi.mock('react-leaflet', () => ({
+  MapContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="map-container">{children}</div>
+  ),
+  TileLayer: () => null,
+  useMap: () => ({ fitBounds: vi.fn(), invalidateSize: vi.fn() }),
+}));
+
 vi.mock('../auth/dropboxAuth', () => ({
   disconnect: (...args: unknown[]) => mockDisconnect(...args),
 }));
@@ -325,7 +333,7 @@ describe('Connected > top tab bar', () => {
 
   it.each([
     { key: '{ArrowRight}', expectActive: 'Flagged', expectInactive: 'Browse' },
-    { key: '{ArrowLeft}', expectActive: 'Groups', expectInactive: 'Browse' },
+    { key: '{ArrowLeft}', expectActive: 'Map', expectInactive: 'Browse' },
   ])('should move tab selection with $key arrow key', async ({ key, expectActive, expectInactive }) => {
     const user = userEvent.setup();
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
@@ -334,5 +342,25 @@ describe('Connected > top tab bar', () => {
     await user.keyboard(key);
     expect(screen.getByRole('tab', { name: expectActive })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: expectInactive })).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('should render a Map tab in the header', () => {
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    expect(screen.getByRole('tab', { name: 'Map' })).toBeInTheDocument();
+  });
+
+  it('should mark the Map tab active (aria-selected=true) after it is clicked', async () => {
+    const user = userEvent.setup();
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    await user.click(screen.getByRole('tab', { name: 'Map' }));
+    expect(screen.getByRole('tab', { name: 'Map' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Browse' })).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('should render the Map empty state when the Map tab is clicked with no groups', async () => {
+    const user = userEvent.setup();
+    render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    await user.click(screen.getByRole('tab', { name: 'Map' }));
+    expect(screen.getByText(/create groups in the flagged tab to see them on the map/i)).toBeInTheDocument();
   });
 });
