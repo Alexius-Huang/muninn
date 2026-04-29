@@ -20,6 +20,7 @@ Opens a native macOS window. You'll be prompted to enter a Dropbox access token 
 ## Stack
 
 - TypeScript + React 19 + Vite
+- Zustand v5 (client state — `src/curator/store.ts`)
 - Tailwind v4 (`@tailwindcss/vite`)
 - Tauri v2 (Rust host + WebView)
 - Vitest + React Testing Library
