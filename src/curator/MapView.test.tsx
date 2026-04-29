@@ -4,6 +4,10 @@ import { render, screen, act } from '@testing-library/react';
 
 const mockFitBounds = vi.fn();
 const mockInvalidateSize = vi.fn();
+const mockAddLayer = vi.fn();
+const mockRemoveLayer = vi.fn();
+
+vi.mock('leaflet.markercluster', () => ({}));
 
 vi.mock('react-leaflet', () => ({
   MapContainer: ({
@@ -29,9 +33,15 @@ vi.mock('react-leaflet', () => ({
   TileLayer: ({ url, attribution }: { url: string; attribution: string }) => (
     <div data-testid="tile-layer" data-url={url} data-attribution={attribution} />
   ),
-  useMap: () => ({ fitBounds: mockFitBounds, invalidateSize: mockInvalidateSize }),
+  useMap: () => ({
+    fitBounds: mockFitBounds,
+    invalidateSize: mockInvalidateSize,
+    addLayer: mockAddLayer,
+    removeLayer: mockRemoveLayer,
+  }),
 }));
 
+import L from 'leaflet';
 import { MapView } from './MapView';
 import { useAppStore, _resetStoreForTesting } from './store';
 import type { Group } from './groups';
@@ -47,9 +57,15 @@ function makeGroup(overrides: Partial<Group> = {}): Group {
   };
 }
 
+let mockCluster: { addLayer: ReturnType<typeof vi.fn> };
+
 beforeEach(() => {
   mockFitBounds.mockReset();
   mockInvalidateSize.mockReset();
+  mockAddLayer.mockReset();
+  mockRemoveLayer.mockReset();
+  mockCluster = { addLayer: vi.fn() };
+  (L as unknown as Record<string, unknown>).markerClusterGroup = vi.fn(() => mockCluster);
   _resetStoreForTesting();
 });
 
@@ -116,5 +132,49 @@ describe('MapView', () => {
     });
 
     expect(screen.queryByText(/no groups yet/i)).not.toBeInTheDocument();
+  });
+
+  it('should call map.addLayer with the cluster group when groups are non-empty', async () => {
+    useAppStore.setState({ groups: [makeGroup()] });
+    await act(async () => { render(<MapView />); });
+    expect(mockAddLayer).toHaveBeenCalledWith(mockCluster);
+  });
+
+  it('should call map.removeLayer on unmount', async () => {
+    useAppStore.setState({ groups: [makeGroup()] });
+    let unmount!: () => void;
+    await act(async () => { ({ unmount } = render(<MapView />)); });
+    await act(async () => { unmount(); });
+    expect(mockRemoveLayer).toHaveBeenCalledWith(mockCluster);
+  });
+
+  it.each([
+    [0],
+    [1],
+    [3],
+    [5],
+  ])('should add %i marker(s) to the cluster group', async (count) => {
+    const groups = Array.from({ length: count }, (_, i) =>
+      makeGroup({ id: String(i), lat: 48 + i, lng: 2 + i }),
+    );
+    useAppStore.setState({ groups });
+    await act(async () => { render(<MapView />); });
+    expect(mockCluster.addLayer).toHaveBeenCalledTimes(count);
+  });
+
+  it('should recreate the cluster layer when groups change', async () => {
+    useAppStore.setState({ groups: [makeGroup({ id: 'g1' })] });
+    await act(async () => { render(<MapView />); });
+    expect(mockAddLayer).toHaveBeenCalledTimes(1);
+
+    const newCluster = { addLayer: vi.fn() };
+    (L as unknown as Record<string, unknown>).markerClusterGroup = vi.fn(() => newCluster);
+
+    await act(async () => {
+      useAppStore.setState({ groups: [makeGroup({ id: 'g2' }), makeGroup({ id: 'g3' })] });
+    });
+
+    expect(mockRemoveLayer).toHaveBeenCalledWith(mockCluster);
+    expect(mockAddLayer).toHaveBeenCalledWith(newCluster);
   });
 });

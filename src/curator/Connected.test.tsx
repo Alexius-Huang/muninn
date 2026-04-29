@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import L from 'leaflet';
 import { Connected } from './Connected';
 
 const mockDisconnect = vi.fn();
@@ -23,12 +24,19 @@ const LOADING_CACHE = {
   request: vi.fn(() => LOADING_STATE),
 };
 
+vi.mock('leaflet.markercluster', () => ({}));
+
 vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="map-container">{children}</div>
   ),
   TileLayer: () => null,
-  useMap: () => ({ fitBounds: vi.fn(), invalidateSize: vi.fn() }),
+  useMap: () => ({
+    fitBounds: vi.fn(),
+    invalidateSize: vi.fn(),
+    addLayer: vi.fn(),
+    removeLayer: vi.fn(),
+  }),
 }));
 
 vi.mock('../auth/dropboxAuth', () => ({
@@ -118,6 +126,7 @@ function makeFile(name: string, path: string) {
 }
 
 beforeEach(() => {
+  (L as unknown as Record<string, unknown>).markerClusterGroup = vi.fn(() => ({ addLayer: vi.fn() }));
   mockDisconnect.mockReset();
   mockDisconnect.mockResolvedValue(undefined);
   mockSetFlag.mockReset();

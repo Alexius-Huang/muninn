@@ -1,8 +1,18 @@
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import L from 'leaflet';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import { useAppStore } from './store';
+import type { Group } from './groups';
+
+delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
+L.Icon.Default.mergeOptions({ iconUrl: markerIcon, iconRetinaUrl: markerIcon2x, shadowUrl: markerShadow });
 
 function FitBounds({ groups }: { groups: { lat: number; lng: number }[] }) {
   const map = useMap();
@@ -24,6 +34,19 @@ function ResizeOnWindow() {
   return null;
 }
 
+function MarkerClusterLayer({ groups }: { groups: Group[] }) {
+  const map = useMap();
+  useEffect(() => {
+    const clusterGroup = L.markerClusterGroup();
+    for (const group of groups) {
+      L.marker([group.lat, group.lng]).addTo(clusterGroup);
+    }
+    map.addLayer(clusterGroup);
+    return () => { map.removeLayer(clusterGroup); };
+  }, [map, groups]);
+  return null;
+}
+
 export function MapView() {
   const groups = useAppStore((s) => s.groups);
   return (
@@ -42,6 +65,7 @@ export function MapView() {
         />
         <FitBounds groups={groups} />
         <ResizeOnWindow />
+        <MarkerClusterLayer groups={groups} />
       </MapContainer>
       {groups.length === 0 && (
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-[400]">
