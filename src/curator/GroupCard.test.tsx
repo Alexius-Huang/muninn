@@ -40,6 +40,7 @@ function makeCache(): ThumbnailCache {
     peek: () => LOADING_STATE,
     subscribe: () => () => {},
     request: vi.fn(),
+    retry: vi.fn(),
   };
 }
 

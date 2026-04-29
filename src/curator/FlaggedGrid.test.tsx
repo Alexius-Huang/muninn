@@ -11,6 +11,7 @@ const mockCache: ThumbnailCache = {
   request: vi.fn(() => LOADING_STATE),
   subscribe: vi.fn(() => () => {}),
   peek: vi.fn(() => LOADING_STATE),
+  retry: vi.fn(),
 };
 
 beforeAll(() => {

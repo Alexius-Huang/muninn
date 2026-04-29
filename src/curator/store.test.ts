@@ -279,4 +279,63 @@ describe('useAppStore — cache', () => {
     expect(cb).toHaveBeenCalled();
     expect(cache.peek('/photos/a.jpg')).toEqual({ tag: 'success', dataUrl: 'data:image/jpeg;base64,abc' });
   });
+
+  it('createThumbnailCache retry transitions error → loading → success and re-issues batch for only that path', async () => {
+    const cache = createThumbnailCache();
+    mockGetThumbnailBatch.mockResolvedValueOnce([
+      { tag: 'failure', path_lower: '/photos/a.jpg', reason: 'http_500' },
+    ]);
+    cache.request('/Photos/a.jpg');
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => {});
+    expect(cache.peek('/photos/a.jpg')).toEqual({ tag: 'error' });
+
+    mockGetThumbnailBatch.mockResolvedValueOnce([
+      { tag: 'success', path_lower: '/photos/a.jpg', dataUrl: 'data:image/jpeg;base64,retry' },
+    ]);
+    const cb = vi.fn();
+    cache.subscribe('/photos/a.jpg', cb);
+    cache.retry('/photos/a.jpg');
+    expect(cache.peek('/photos/a.jpg')).toEqual({ tag: 'loading' });
+
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => {});
+    expect(cache.peek('/photos/a.jpg')).toEqual({ tag: 'success', dataUrl: 'data:image/jpeg;base64,retry' });
+    expect(cb).toHaveBeenCalled();
+    expect(mockGetThumbnailBatch).toHaveBeenLastCalledWith(['/photos/a.jpg']);
+  });
+
+  it('createThumbnailCache retry is a no-op when state is not error', async () => {
+    const cache = createThumbnailCache();
+    cache.retry('/photos/a.jpg');
+    await act(async () => { await Promise.resolve(); });
+    expect(mockGetThumbnailBatch).not.toHaveBeenCalled();
+  });
+
+  it('createThumbnailCache retry second click while in-flight is a no-op', async () => {
+    const cache = createThumbnailCache();
+    mockGetThumbnailBatch.mockResolvedValueOnce([
+      { tag: 'failure', path_lower: '/photos/a.jpg', reason: 'http_500' },
+    ]);
+    cache.request('/Photos/a.jpg');
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => {});
+    expect(cache.peek('/photos/a.jpg')).toEqual({ tag: 'error' });
+
+    let resolveRetry!: (v: import('../dropbox/client').ThumbnailResult[]) => void;
+    mockGetThumbnailBatch.mockReturnValueOnce(
+      new Promise<import('../dropbox/client').ThumbnailResult[]>((res) => { resolveRetry = res; }),
+    );
+
+    cache.retry('/photos/a.jpg'); // first retry — in-flight
+    cache.retry('/photos/a.jpg'); // second click — no-op
+
+    // 1 call for initial flush + 1 for first retry only
+    expect(mockGetThumbnailBatch).toHaveBeenCalledTimes(2);
+
+    resolveRetry([{ tag: 'success', path_lower: '/photos/a.jpg', dataUrl: 'data:image/jpeg;base64,ok' }]);
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => {});
+    expect(cache.peek('/photos/a.jpg')).toEqual({ tag: 'success', dataUrl: 'data:image/jpeg;base64,ok' });
+  });
 });

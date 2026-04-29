@@ -18,6 +18,7 @@ export type ThumbnailCache = {
   request: (pathDisplay: string) => ThumbnailState;
   subscribe: (pathLower: string, cb: () => void) => () => void;
   peek: (pathLower: string) => ThumbnailState;
+  retry: (pathLower: string) => void;
 };
 
 const DEFAULT_LOADING: ThumbnailState = { tag: 'loading' };
@@ -26,6 +27,7 @@ export function createThumbnailCache(): ThumbnailCache {
   const cacheMap = new Map<string, ThumbnailState>();
   const subsMap = new Map<string, Set<() => void>>();
   const pending = new Set<string>();
+  const retrying = new Set<string>();
   let scheduled = false;
 
   function notify(pathLower: string) {
@@ -89,7 +91,32 @@ export function createThumbnailCache(): ThumbnailCache {
     return cacheMap.get(pathLower) ?? DEFAULT_LOADING;
   }
 
-  return { request, subscribe, peek };
+  function retry(pathLower: string): void {
+    if (cacheMap.get(pathLower)?.tag !== 'error') return;
+    if (retrying.has(pathLower)) return;
+
+    retrying.add(pathLower);
+    cacheMap.set(pathLower, { tag: 'loading' });
+    notify(pathLower);
+
+    getThumbnailBatch([pathLower]).then(
+      (results) => {
+        retrying.delete(pathLower);
+        const r = results[0];
+        if (r) {
+          cacheMap.set(r.path_lower, r.tag === 'success' ? { tag: 'success', dataUrl: r.dataUrl } : { tag: 'error' });
+          notify(r.path_lower);
+        }
+      },
+      () => {
+        retrying.delete(pathLower);
+        cacheMap.set(pathLower, { tag: 'error' });
+        notify(pathLower);
+      },
+    );
+  }
+
+  return { request, subscribe, peek, retry };
 }
 
 // ---------------------------------------------------------------------------
