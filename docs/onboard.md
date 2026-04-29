@@ -20,6 +20,7 @@ Next: grouping / categorisation epic (MUN-20+), map view epic (MUN-17+).
 
 - Language / runtime: TypeScript on Node (frontend) + Rust (Tauri host)
 - Framework: Tauri v2 + Vite + React 19
+- Client state: Zustand v5 (`src/curator/store.ts`) — single `useAppStore` for cross-tab state
 - Styling: Tailwind v4 (`@tailwindcss/vite`)
 - Tests: Vitest + React Testing Library + jsdom
 - Package manager: pnpm
@@ -60,6 +61,7 @@ Verify: `rustc --version` (expect 1.77+), `cargo --version`.
 - **Token in macOS Keychain.** Stored under service `com.huang.muninn`, account `dropbox_access_token`, via the `keyring` Rust crate (custom Tauri commands). **Never** store the access token in localStorage, sessionStorage, or any plain file.
 - **Curation state on disk.** Per-folder JSON files under the app's data dir. One file per Dropbox folder, keyed by a hash of the folder path. Human-readable and editable outside the app.
 - **Group membership is implicit "keep".** A photo is always in exactly one of three states: **unprocessed** (no `flag`, no `groupId`), **flagged** (keep/discard, no `groupId`), or **grouped** (implicit keep — `groupId` set, no `flag`). `flag` and `groupId` are never both set. Transitions: assigning to a group clears `flag` and sets `groupId`; deleting a group clears both `flag` and `groupId`, returning the photo to unprocessed.
+- **Cross-tab state lives in Zustand (`src/curator/store.ts`).** The `useAppStore` hook owns `groups`, `recordsByGroupId`, `flaggedRecords`, the thumbnail `cache`, plus actions (`loadGroups`, `createGroup`, `deleteGroup`, `loadFlagged`, `flushFlagged`, `setFlaggedFlag`, `clearAllFlagged`, `assignGroupId`, `loadGrouped`). `Connected.tsx` calls `loadGroups/loadFlagged/loadGrouped` once on mount; tab views read state via selectors instead of receiving props. **`useCurationState` stays as a hook** — it's folder-scoped (Browse-tab only), not cross-tab. In tests, seed the store via `useAppStore.setState({...})` in `beforeEach`, and call `_resetStoreForTesting()` to clear module-level mutable state (debounce timers, in-memory flagged-files map).
 - **Test folder:** `/Photos/2026-04-12 France, Lyon` — 482 files. Use this for end-to-end manual testing once features land.
 - **Spike artifacts:** `scratch/photo-curator-spike/` has Node scripts that proved Dropbox API works for metadata + thumbnails but not GPS. Do not reuse them; the `.env` there contains a Dropbox token — leave it alone.
 - **GPS note:** user's ASUS phone does not write GPS to EXIF. The map view is deferred to a future epic; v1 is curation-only.

@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FlaggedGrid } from './FlaggedGrid';
-import type { FlatRecord } from './useAllFlagged';
-import type { ThumbnailCache } from './useThumbnailCache';
+import type { FlatRecord } from './store';
+import type { ThumbnailCache } from './store';
 
 const LOADING_STATE = { tag: 'loading' as const };
 const mockCache: ThumbnailCache = {

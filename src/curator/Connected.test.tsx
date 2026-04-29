@@ -9,10 +9,19 @@ const mockSetFlag = vi.fn();
 const mockFlushBrowse = vi.fn();
 const mockReloadBrowse = vi.fn();
 const mockFlushFlagged = vi.fn();
-const mockReloadFlagged = vi.fn();
+const mockLoadFlagged = vi.fn();
+const mockLoadGrouped = vi.fn();
+const mockFlushGrouped = vi.fn();
+const mockLoadGroups = vi.fn();
 const mockListCuration = vi.fn();
 const mockWriteCuration = vi.fn();
-let mockFlaggedRecords: unknown[] = [];
+
+const LOADING_STATE = { tag: 'loading' as const };
+const LOADING_CACHE = {
+  peek: vi.fn(() => LOADING_STATE),
+  subscribe: vi.fn(() => () => {}),
+  request: vi.fn(() => LOADING_STATE),
+};
 
 vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => (
@@ -37,34 +46,45 @@ vi.mock('../dropbox/client', async (importOriginal) => {
 });
 
 vi.mock('./useCurationState', () => ({
-  useCurationState: vi.fn(() => ({ flags: {}, groupIds: {}, setFlag: mockSetFlag, removeFromGroup: vi.fn(), flush: mockFlushBrowse, reload: mockReloadBrowse })),
-}));
-
-vi.mock('./useAllFlagged', () => ({
-  useAllFlagged: vi.fn(() => ({ records: mockFlaggedRecords, setFlag: vi.fn(), clearAll: vi.fn(), flush: mockFlushFlagged, reload: mockReloadFlagged, loading: false })),
+  useCurationState: vi.fn(() => ({
+    flags: {},
+    groupIds: {},
+    setFlag: mockSetFlag,
+    removeFromGroup: vi.fn(),
+    flush: mockFlushBrowse,
+    reload: mockReloadBrowse,
+    clearAll: vi.fn(),
+  })),
 }));
 
 vi.mock('./curation', () => ({
   listCuration: (...args: unknown[]) => mockListCuration(...args),
   writeCuration: (...args: unknown[]) => mockWriteCuration(...args),
+  migrateToIdKeys: vi.fn(() => ({ changed: false, file: { folderPath: '', records: {} }, droppedCount: 0 })),
 }));
 
-vi.mock('./groups', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./groups')>();
-  return {
-    ...actual,
-    readGroups: vi.fn().mockResolvedValue([]),
-    createGroupAndPersist: vi.fn().mockResolvedValue({ id: 'g1', name: 'Test', lat: 0, lng: 0, photoIds: [] }),
-  };
-});
-
-vi.mock('./useGroupedRecords', () => ({
-  useGroupedRecords: vi.fn(() => ({
-    recordsByGroupId: new Map(),
-    reload: vi.fn().mockResolvedValue(undefined),
-    flush: vi.fn().mockResolvedValue(undefined),
-    loading: false,
-  })),
+vi.mock('./store', () => ({
+  useAppStore: vi.fn((selector?: (state: unknown) => unknown) => {
+    const state = {
+      groups: [],
+      recordsByGroupId: new Map(),
+      flaggedRecords: [],
+      flaggedLoading: false,
+      groupedLoading: false,
+      cache: LOADING_CACHE,
+      loadGroups: mockLoadGroups,
+      loadFlagged: mockLoadFlagged,
+      loadGrouped: mockLoadGrouped,
+      flushFlagged: mockFlushFlagged,
+      flushGrouped: mockFlushGrouped,
+      setFlaggedFlag: vi.fn(),
+      clearAllFlagged: vi.fn(),
+      createGroup: vi.fn().mockResolvedValue(undefined),
+      deleteGroup: vi.fn().mockResolvedValue(undefined),
+      assignGroupId: vi.fn().mockResolvedValue(undefined),
+    };
+    return selector ? selector(state) : state;
+  }),
 }));
 
 beforeAll(() => {
@@ -107,13 +127,18 @@ beforeEach(() => {
   mockReloadBrowse.mockResolvedValue(undefined);
   mockFlushFlagged.mockReset();
   mockFlushFlagged.mockResolvedValue(undefined);
-  mockReloadFlagged.mockReset();
-  mockReloadFlagged.mockResolvedValue(undefined);
+  mockLoadFlagged.mockReset();
+  mockLoadFlagged.mockResolvedValue(undefined);
+  mockLoadGrouped.mockReset();
+  mockLoadGrouped.mockResolvedValue(undefined);
+  mockFlushGrouped.mockReset();
+  mockFlushGrouped.mockResolvedValue(undefined);
+  mockLoadGroups.mockReset();
+  mockLoadGroups.mockResolvedValue(undefined);
   mockListCuration.mockReset();
   mockWriteCuration.mockReset();
   mockListCuration.mockResolvedValue([]);
   mockWriteCuration.mockResolvedValue(undefined);
-  mockFlaggedRecords = [];
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
@@ -243,7 +268,6 @@ describe('Connected > top tab bar', () => {
 
   it('should show the flagged empty state when the Flagged tab is clicked', async () => {
     const user = userEvent.setup();
-    mockListCuration.mockResolvedValue([]);
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await user.click(screen.getByRole('tab', { name: 'Flagged' }));
     await waitFor(() => expect(screen.getByText('No flagged photos yet')).toBeInTheDocument());
@@ -289,7 +313,7 @@ describe('Connected > top tab bar', () => {
     expect(mockFlushBrowse).toHaveBeenCalled();
   });
 
-  it('should flush Flagged then reload Browse when switching from Flagged to Browse', async () => {
+  it('should call store flushFlagged then reload Browse when switching from Flagged to Browse', async () => {
     const user = userEvent.setup();
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await user.click(screen.getByRole('tab', { name: 'Flagged' }));
@@ -300,16 +324,11 @@ describe('Connected > top tab bar', () => {
     expect(mockReloadBrowse).toHaveBeenCalledOnce();
   });
 
-  it('should show a flagged photo in Flagged tab after it was flagged in Browse', async () => {
+  it('should show the flagged empty state in Flagged tab', async () => {
     const user = userEvent.setup();
-    mockFlaggedRecords = [{
-      folderPath: '/Photos/Lyon',
-      key: '/photos/lyon/a.jpg',
-      record: { pathLower: '/photos/lyon/a.jpg', pathDisplay: '/Photos/Lyon/a.jpg', name: 'a.jpg', flag: 'keep' },
-    }];
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await user.click(screen.getByRole('tab', { name: 'Flagged' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'a.jpg' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('No flagged photos yet')).toBeInTheDocument());
   });
 
   it('should not render the Browse PreviewPanel when on the Flagged tab', async () => {

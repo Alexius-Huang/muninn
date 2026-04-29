@@ -3,11 +3,8 @@ import { wrapIndex, jumpRow } from './navigate';
 import { PreviewPanel } from './PreviewPanel';
 import type { NavigateDirection } from './PreviewPanel';
 import { FlaggedGrid } from './FlaggedGrid';
-import type { AllFlaggedReturn } from './useAllFlagged';
-import type { ThumbnailCache } from './useThumbnailCache';
-import type { Flag } from './curation';
+import { useAppStore } from './store';
 import { CreateGroupModal } from './CreateGroupModal';
-import type { NominatimLocation } from '@/components/NominatimSearch';
 import {
   Dialog,
   DialogContent,
@@ -17,24 +14,26 @@ import {
   DialogDescription,
 } from '@/components/shadcn/dialog';
 import { Button } from '@/components/shadcn/button';
+import type { Flag } from './curation';
 
 type Filter = 'all' | 'keep' | 'discard';
 
-type Props = Pick<AllFlaggedReturn, 'records' | 'setFlag' | 'clearAll' | 'loading'> & {
+type Props = {
   isActive: boolean;
-  cache: ThumbnailCache;
   previewWidth: number;
   isResizing?: boolean;
   onPreviewResize: (e: React.MouseEvent) => void;
   email: string;
-  onCreateGroup: (args: {
-    name: string;
-    location: NominatimLocation;
-    photos: { folderPath: string; key: string }[];
-  }) => Promise<void>;
 };
 
-export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cache, previewWidth, isResizing = false, onPreviewResize, email, onCreateGroup }: Props) {
+export function FlaggedView({ isActive, previewWidth, isResizing = false, onPreviewResize, email }: Props) {
+  const records = useAppStore((s) => s.flaggedRecords);
+  const loading = useAppStore((s) => s.flaggedLoading);
+  const cache = useAppStore((s) => s.cache);
+  const setFlaggedFlag = useAppStore((s) => s.setFlaggedFlag);
+  const clearAllFlagged = useAppStore((s) => s.clearAllFlagged);
+  const createGroup = useAppStore((s) => s.createGroup);
+
   const [filter, setFilter] = useState<Filter>('all');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [columns, setColumns] = useState(4);
@@ -57,8 +56,7 @@ export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cac
 
   function handleFlag(value: Flag | undefined) {
     if (!selectedFlat) return;
-    setFlag(selectedFlat.folderPath, selectedFlat.key, value);
-    // If the record would leave the filtered view (unflag or wrong flag for current filter), close preview
+    setFlaggedFlag(selectedFlat.folderPath, selectedFlat.key, value);
     if (value === undefined || (filter !== 'all' && value !== filter)) {
       setSelectedIndex(null);
     }
@@ -134,7 +132,7 @@ export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cac
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => { clearAll(); setSelectedIndex(null); setConfirmOpen(false); }}
+                  onClick={() => { clearAllFlagged(); setSelectedIndex(null); setConfirmOpen(false); }}
                 >
                   Clear All
                 </Button>
@@ -195,7 +193,7 @@ export function FlaggedView({ records, setFlag, clearAll, loading, isActive, cac
         email={email}
         photoCount={filtered.length}
         onSubmit={({ name, location }) =>
-          onCreateGroup({ name, location, photos: filtered.map(({ folderPath, key }) => ({ folderPath, key })) })
+          createGroup({ name, location, photos: filtered.map(({ folderPath, key }) => ({ folderPath, key })) })
         }
       />
     </div>

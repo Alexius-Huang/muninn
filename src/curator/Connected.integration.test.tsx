@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Connected } from './Connected';
+import { _resetStoreForTesting } from './store';
 
 const mockDisconnect = vi.fn();
 const mockReadCuration = vi.fn();
@@ -10,6 +11,11 @@ const mockWriteCuration = vi.fn();
 const mockListCuration = vi.fn();
 const mockReadGroups = vi.fn();
 const mockDeleteGroupAndCascade = vi.fn();
+
+vi.mock('./store', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./store')>();
+  return actual;
+});
 
 vi.mock('../auth/dropboxAuth', () => ({
   disconnect: (...args: unknown[]) => mockDisconnect(...args),
@@ -72,6 +78,7 @@ function makeFile(name: string, path: string) {
 }
 
 beforeEach(() => {
+  _resetStoreForTesting();
   mockDisconnect.mockReset();
   mockDisconnect.mockResolvedValue(undefined);
   mockReadCuration.mockReset();

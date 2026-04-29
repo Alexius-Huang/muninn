@@ -4,8 +4,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GroupCard } from './GroupCard';
 import type { Group } from './groups';
-import type { FlatRecord } from './useAllFlagged';
-import type { ThumbnailCache } from './useThumbnailCache';
+import type { FlatRecord } from './store';
+import type { ThumbnailCache } from './store';
 
 function makeGroup(overrides: Partial<Group> = {}): Group {
   return {

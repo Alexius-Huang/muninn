@@ -22,6 +22,11 @@ vi.mock('./curator/curation', () => ({
   migrateLegacyCurationFile: vi.fn((x: unknown) => x),
 }));
 
+vi.mock('./curator/groups', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./curator/groups')>();
+  return { ...actual, readGroups: vi.fn().mockResolvedValue([]) };
+});
+
 vi.mock('./dropbox/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./dropbox/client')>();
   return {

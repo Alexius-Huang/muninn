@@ -6,19 +6,14 @@ import { ThumbnailGrid, sortFiles } from './ThumbnailGrid';
 import { PreviewPanel } from './PreviewPanel';
 import type { GroupInfo } from './PreviewPanel';
 import { FlaggedView } from './FlaggedView';
-import { useThumbnailCache } from './useThumbnailCache';
 import { useCurationState } from './useCurationState';
-import { useAllFlagged } from './useAllFlagged';
 import { wrapIndex, jumpRow } from './navigate';
 import type { NavigateDirection } from './PreviewPanel';
-import { createGroupAndPersist, readGroups, deleteGroupAndCascade } from './groups';
-import type { Group } from './groups';
-import type { NominatimLocation } from '@/components/NominatimSearch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shadcn/tabs';
 import { Button } from '@/components/shadcn/button';
 import { GroupsView } from './GroupsView';
 import { MapView } from './MapView';
-import { useGroupedRecords } from './useGroupedRecords';
+import { useAppStore } from './store';
 
 type Props = {
   account: DropboxAccount;
@@ -54,14 +49,15 @@ export function Connected({ account, onDisconnect }: Props) {
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const pendingTabRef = useRef<'browse' | 'flagged' | 'groups' | 'map' | null>(null);
 
-  const [groups, setGroups] = useState<Group[]>([]);
+  const { groups, loadGroups, loadFlagged, loadGrouped, flushFlagged, flushGrouped } = useAppStore();
 
   useEffect(() => {
-    readGroups().then(setGroups).catch(() => {});
-  }, []);
+    void loadGroups();
+    void loadFlagged();
+    void loadGrouped();
+  }, [loadGroups, loadFlagged, loadGrouped]);
 
-  const cache = useThumbnailCache();
-  const { recordsByGroupId, reload: reloadGrouped, flush: flushGrouped, loading: groupedLoading } = useGroupedRecords();
+  const cache = useAppStore((s) => s.cache);
   const { flags, groupIds, setFlag, removeFromGroup, clearAll, flush: flushBrowse, reload: reloadBrowse } = useCurationState(active?.path ?? null, active ? sortFiles(active.entries) : []);
   const visibleEntries = active
     ? (showGrouped
@@ -69,33 +65,6 @@ export function Connected({ account, onDisconnect }: Props) {
         : active.entries.filter((e) => e['.tag'] !== 'file' || !groupIds[e.id]))
     : [];
   const files = sortFiles(visibleEntries);
-  const { records: flaggedRecords, setFlag: setFlaggedFlag, clearAll: clearAllFlagged, assignGroupId, flush: flushFlagged, reload: reloadFlagged, loading: flaggedLoading } = useAllFlagged();
-
-  async function handleCreateGroup({ name, location, photos }: {
-    name: string;
-    location: NominatimLocation;
-    photos: { folderPath: string; key: string }[];
-  }) {
-    const group = await createGroupAndPersist({
-      name,
-      lat: location.lat,
-      lng: location.lng,
-      placeId: location.placeId,
-      locationName: location.displayName,
-      photoIds: photos.map((p) => p.key),
-    });
-    await assignGroupId(photos, group.id);
-    readGroups().then(setGroups).catch(() => {});
-  }
-
-  async function handleDeleteGroup(id: string) {
-    await deleteGroupAndCascade(id);
-    await Promise.all([
-      readGroups().then(setGroups),
-      reloadGrouped(),
-      reloadFlagged(),
-    ]);
-  }
 
   async function handleDisconnect() {
     if (!confirmingDisconnect) {
@@ -192,9 +161,9 @@ export function Connected({ account, onDisconnect }: Props) {
         if (tab === 'browse') await flushBrowse();
         if (tab === 'flagged') await flushFlagged();
         if (tab === 'groups') await flushGrouped();
-        if (target === 'flagged') await reloadFlagged();
+        if (target === 'flagged') await loadFlagged();
         if (target === 'browse') await reloadBrowse();
-        if (target === 'groups') await reloadGrouped();
+        if (target === 'groups') await loadGrouped();
         pendingTabRef.current = null;
         setTab(target);
       }}
@@ -328,17 +297,11 @@ export function Connected({ account, onDisconnect }: Props) {
           className="flex-1 min-h-0 flex overflow-hidden data-[state=inactive]:hidden"
         >
           <FlaggedView
-            records={flaggedRecords}
-            setFlag={setFlaggedFlag}
-            clearAll={clearAllFlagged}
-            loading={flaggedLoading}
             isActive={tab === 'flagged'}
-            cache={cache}
             previewWidth={previewWidth}
             isResizing={isDraggingPreview}
             onPreviewResize={handlePreviewResizeStart}
             email={account.email}
-            onCreateGroup={handleCreateGroup}
           />
         </TabsContent>
 
@@ -348,15 +311,10 @@ export function Connected({ account, onDisconnect }: Props) {
           className="flex-1 min-h-0 flex overflow-hidden data-[state=inactive]:hidden"
         >
           <GroupsView
-            groups={groups}
-            recordsByGroupId={recordsByGroupId}
-            cache={cache}
-            loading={groupedLoading}
             isActive={tab === 'groups'}
             previewWidth={previewWidth}
             isResizing={isDraggingPreview}
             onPreviewResize={handlePreviewResizeStart}
-            onDeleteGroup={handleDeleteGroup}
           />
         </TabsContent>
 
@@ -364,7 +322,7 @@ export function Connected({ account, onDisconnect }: Props) {
           value="map"
           className="flex-1 min-h-0 flex overflow-hidden"
         >
-          <MapView groups={groups} />
+          <MapView />
         </TabsContent>
       </main>
     </Tabs>

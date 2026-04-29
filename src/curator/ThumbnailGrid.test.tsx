@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ThumbnailGrid } from './ThumbnailGrid';
-import type { ThumbnailCache } from './useThumbnailCache';
+import type { ThumbnailCache } from './store';
 import type { DropboxEntry } from '../dropbox/client';
 
 vi.mock('../dropbox/client', async (importOriginal) => {

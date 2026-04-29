@@ -4,19 +4,13 @@ import { GroupDetailView } from './GroupDetailView';
 import { DeleteGroupModal } from './DeleteGroupModal';
 import { sortGroups, type GroupSort } from './groups';
 import type { Group } from './groups';
-import type { FlatRecord } from './useAllFlagged';
-import type { ThumbnailCache } from './useThumbnailCache';
+import { useAppStore } from './store';
 
 type Props = {
-  groups: Group[];
-  recordsByGroupId: Map<string, FlatRecord[]>;
-  cache: ThumbnailCache;
-  loading: boolean;
   isActive: boolean;
   previewWidth: number;
   isResizing?: boolean;
   onPreviewResize: (e: React.MouseEvent) => void;
-  onDeleteGroup: (id: string) => Promise<void>;
 };
 
 const SORT_LABELS: Record<GroupSort, string> = {
@@ -29,22 +23,23 @@ const SORT_LABELS: Record<GroupSort, string> = {
 const SORT_OPTIONS: GroupSort[] = ['newest', 'oldest', 'count', 'location'];
 
 export function GroupsView({
-  groups,
-  recordsByGroupId,
-  cache,
-  loading,
   isActive,
   previewWidth,
   isResizing,
   onPreviewResize,
-  onDeleteGroup,
 }: Props) {
+  const groups = useAppStore((s) => s.groups);
+  const recordsByGroupId = useAppStore((s) => s.recordsByGroupId);
+  const cache = useAppStore((s) => s.cache);
+  const loading = useAppStore((s) => s.groupedLoading);
+  const deleteGroup = useAppStore((s) => s.deleteGroup);
+
   const [sort, setSort] = useState<GroupSort>('newest');
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
 
   async function handleConfirmDelete(id: string) {
-    await onDeleteGroup(id);
+    await deleteGroup(id);
     setGroupToDelete(null);
     setSelectedGroupId(null);
   }
@@ -71,7 +66,6 @@ export function GroupsView({
         <GroupDetailView
           group={selectedGroup}
           records={recordsByGroupId.get(selectedGroup.id) ?? []}
-          cache={cache}
           isActive={isActive}
           previewWidth={previewWidth}
           isResizing={isResizing}

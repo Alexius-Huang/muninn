@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ThumbnailCell } from './ThumbnailCell';
-import type { ThumbnailCache } from './useThumbnailCache';
-import type { FlatRecord } from './useAllFlagged';
+import type { ThumbnailCache } from './store';
+import type { FlatRecord } from './store';
 
 const CELL_SIZE = 160;
 const LABEL_HEIGHT = 20;
