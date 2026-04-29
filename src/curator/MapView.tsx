@@ -2,13 +2,9 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
-import type { Group } from './groups';
+import { useAppStore } from './store';
 
-type Props = {
-  groups: Group[];
-};
-
-function FitBounds({ groups }: { groups: Group[] }) {
+function FitBounds({ groups }: { groups: { lat: number; lng: number }[] }) {
   const map = useMap();
   useEffect(() => {
     if (groups.length === 0) return;
@@ -28,7 +24,8 @@ function ResizeOnWindow() {
   return null;
 }
 
-export function MapView({ groups }: Props) {
+export function MapView() {
+  const groups = useAppStore((s) => s.groups);
   return (
     <div className="flex-1 min-h-0 relative">
       <MapContainer

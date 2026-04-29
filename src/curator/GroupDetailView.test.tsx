@@ -11,19 +11,11 @@ vi.mock('../dropbox/client', async (importOriginal) => {
 });
 
 import { GroupDetailView } from './GroupDetailView';
+import { useAppStore, _resetStoreForTesting } from './store';
 import type { Group } from './groups';
-import type { FlatRecord } from './useAllFlagged';
-import type { ThumbnailCache } from './useThumbnailCache';
+import type { FlatRecord } from './store';
 
 const LOADING_STATE = { tag: 'loading' as const };
-
-function makeCache(): ThumbnailCache {
-  return {
-    peek: () => LOADING_STATE,
-    subscribe: () => () => {},
-    request: vi.fn(),
-  };
-}
 
 function makeGroup(overrides: Partial<Group> = {}): Group {
   return {
@@ -61,7 +53,6 @@ function renderDetail(overrides: {
     <GroupDetailView
       group={overrides.group ?? makeGroup()}
       records={overrides.records ?? [makeRecord('a.jpg'), makeRecord('b.jpg')]}
-      cache={makeCache()}
       isActive={overrides.isActive ?? true}
       previewWidth={480}
       onPreviewResize={vi.fn()}
@@ -85,6 +76,14 @@ beforeAll(() => {
 beforeEach(() => {
   mockGetPreview.mockReset();
   mockGetPreview.mockResolvedValue('data:image/jpeg;base64,hires');
+  _resetStoreForTesting();
+  useAppStore.setState({
+    cache: {
+      peek: () => LOADING_STATE,
+      subscribe: () => () => {},
+      request: vi.fn(),
+    },
+  });
 });
 
 describe('GroupDetailView', () => {

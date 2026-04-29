@@ -4,15 +4,14 @@ import { FlaggedGrid } from './FlaggedGrid';
 import { PreviewPanel } from './PreviewPanel';
 import type { GroupInfo, NavigateDirection } from './PreviewPanel';
 import type { Group } from './groups';
-import type { FlatRecord } from './useAllFlagged';
-import type { ThumbnailCache } from './useThumbnailCache';
+import type { FlatRecord } from './store';
+import { useAppStore } from './store';
 import { wrapIndex, jumpRow } from './navigate';
 import { Button } from '@/components/shadcn/button';
 
 type Props = {
   group: Group;
   records: FlatRecord[];
-  cache: ThumbnailCache;
   isActive: boolean;
   previewWidth: number;
   isResizing?: boolean;
@@ -24,7 +23,6 @@ type Props = {
 export function GroupDetailView({
   group,
   records,
-  cache,
   isActive,
   previewWidth,
   isResizing = false,
@@ -32,6 +30,7 @@ export function GroupDetailView({
   onBack,
   onDelete,
 }: Props) {
+  const cache = useAppStore((s) => s.cache);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [columns, setColumns] = useState(4);
 

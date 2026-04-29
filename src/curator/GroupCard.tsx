@@ -1,8 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { Group } from './groups';
-import type { FlatRecord } from './useAllFlagged';
-import type { ThumbnailCache } from './useThumbnailCache';
+import type { FlatRecord } from './store';
+import type { ThumbnailCache } from './store';
 
 type MosaicCellProps = {
   record: FlatRecord;

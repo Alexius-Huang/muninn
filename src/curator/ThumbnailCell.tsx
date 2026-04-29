@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle, MapPin } from 'lucide-react';
 import type { DropboxFile } from '../dropbox/client';
-import type { ThumbnailState } from './useThumbnailCache';
+import type { ThumbnailState } from './store';
 import type { Flag } from './curation';
 
 type Props = {

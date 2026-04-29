@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FlaggedView } from './FlaggedView';
-import type { ThumbnailCache } from './useThumbnailCache';
-import type { FlatRecord } from './useAllFlagged';
+import { useAppStore, _resetStoreForTesting, createThumbnailCache } from './store';
+import type { FlatRecord } from './store';
 
 vi.mock('../dropbox/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../dropbox/client')>();
@@ -25,13 +25,6 @@ vi.mock('./CreateGroupModal', () => ({
     ) : null,
 }));
 
-const LOADING_STATE = { tag: 'loading' as const };
-const mockCache: ThumbnailCache = {
-  request: vi.fn(() => LOADING_STATE),
-  subscribe: vi.fn(() => () => {}),
-  peek: vi.fn(() => LOADING_STATE),
-};
-
 beforeAll(() => {
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
     configurable: true,
@@ -48,27 +41,28 @@ function makeFlat(folderPath: string, name: string, flag: 'keep' | 'discard'): F
   return {
     folderPath,
     key: pathLower,
-    record: {
-      pathLower,
-      pathDisplay: `${folderPath}/${name}`,
-      name,
-      flag,
-    },
+    record: { pathLower, pathDisplay: `${folderPath}/${name}`, name, flag },
   };
 }
 
 const DEFAULT_PROPS = {
-  records: [] as FlatRecord[],
-  setFlag: vi.fn(),
-  clearAll: vi.fn(),
-  loading: false,
   isActive: true,
-  cache: mockCache,
   previewWidth: 480,
   onPreviewResize: vi.fn(),
   email: 'test@example.com',
-  onCreateGroup: vi.fn().mockResolvedValue(undefined),
 };
+
+beforeEach(() => {
+  _resetStoreForTesting();
+  useAppStore.setState({
+    flaggedRecords: [],
+    flaggedLoading: false,
+    cache: createThumbnailCache(),
+    setFlaggedFlag: vi.fn(),
+    clearAllFlagged: vi.fn(),
+    createGroup: vi.fn().mockResolvedValue(undefined),
+  });
+});
 
 describe('FlaggedView', () => {
   it('should show "No flagged photos yet" when there are no records', () => {
@@ -77,22 +71,26 @@ describe('FlaggedView', () => {
   });
 
   it('should render thumbnails for records across multiple folders', () => {
-    const records = [
-      makeFlat('/Photos/Lyon', 'a.jpg', 'keep'),
-      makeFlat('/Photos/Paris', 'b.jpg', 'discard'),
-    ];
-    render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+    useAppStore.setState({
+      flaggedRecords: [
+        makeFlat('/Photos/Lyon', 'a.jpg', 'keep'),
+        makeFlat('/Photos/Paris', 'b.jpg', 'discard'),
+      ],
+    });
+    render(<FlaggedView {...DEFAULT_PROPS} />);
     expect(screen.getByRole('button', { name: 'a.jpg' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'b.jpg' })).toBeInTheDocument();
   });
 
   it('should hide discard records when Keep filter is selected', async () => {
     const user = userEvent.setup();
-    const records = [
-      makeFlat('/Photos/Lyon', 'keep.jpg', 'keep'),
-      makeFlat('/Photos/Lyon', 'discard.jpg', 'discard'),
-    ];
-    render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+    useAppStore.setState({
+      flaggedRecords: [
+        makeFlat('/Photos/Lyon', 'keep.jpg', 'keep'),
+        makeFlat('/Photos/Lyon', 'discard.jpg', 'discard'),
+      ],
+    });
+    render(<FlaggedView {...DEFAULT_PROPS} />);
     await user.click(screen.getByRole('button', { name: 'Keep' }));
     expect(screen.getByRole('button', { name: 'keep.jpg' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'discard.jpg' })).not.toBeInTheDocument();
@@ -100,11 +98,13 @@ describe('FlaggedView', () => {
 
   it('should hide keep records when Discard filter is selected', async () => {
     const user = userEvent.setup();
-    const records = [
-      makeFlat('/Photos/Lyon', 'keep.jpg', 'keep'),
-      makeFlat('/Photos/Lyon', 'discard.jpg', 'discard'),
-    ];
-    render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+    useAppStore.setState({
+      flaggedRecords: [
+        makeFlat('/Photos/Lyon', 'keep.jpg', 'keep'),
+        makeFlat('/Photos/Lyon', 'discard.jpg', 'discard'),
+      ],
+    });
+    render(<FlaggedView {...DEFAULT_PROPS} />);
     await user.click(screen.getByRole('button', { name: 'Discard' }));
     expect(screen.getByRole('button', { name: 'discard.jpg' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'keep.jpg' })).not.toBeInTheDocument();
@@ -112,19 +112,21 @@ describe('FlaggedView', () => {
 
   it('should show "No photos match this filter" when filter excludes all records', async () => {
     const user = userEvent.setup();
-    const records = [makeFlat('/Photos/Lyon', 'a.jpg', 'keep')];
-    render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+    useAppStore.setState({ flaggedRecords: [makeFlat('/Photos/Lyon', 'a.jpg', 'keep')] });
+    render(<FlaggedView {...DEFAULT_PROPS} />);
     await user.click(screen.getByRole('button', { name: 'Discard' }));
     expect(screen.getByText('No photos match this filter')).toBeInTheDocument();
   });
 
   it('should show All photos when All filter is selected after narrowing', async () => {
     const user = userEvent.setup();
-    const records = [
-      makeFlat('/Photos/Lyon', 'keep.jpg', 'keep'),
-      makeFlat('/Photos/Lyon', 'discard.jpg', 'discard'),
-    ];
-    render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+    useAppStore.setState({
+      flaggedRecords: [
+        makeFlat('/Photos/Lyon', 'keep.jpg', 'keep'),
+        makeFlat('/Photos/Lyon', 'discard.jpg', 'discard'),
+      ],
+    });
+    render(<FlaggedView {...DEFAULT_PROPS} />);
     await user.click(screen.getByRole('button', { name: 'Keep' }));
     await user.click(screen.getByRole('button', { name: 'All' }));
     expect(screen.getByRole('button', { name: 'keep.jpg' })).toBeInTheDocument();
@@ -133,16 +135,16 @@ describe('FlaggedView', () => {
 
   it('should open PreviewPanel when a thumbnail is clicked', async () => {
     const user = userEvent.setup();
-    const records = [makeFlat('/Photos/Lyon', 'a.jpg', 'keep')];
-    render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+    useAppStore.setState({ flaggedRecords: [makeFlat('/Photos/Lyon', 'a.jpg', 'keep')] });
+    render(<FlaggedView {...DEFAULT_PROPS} />);
     await user.click(screen.getByRole('button', { name: 'a.jpg' }));
     await waitFor(() => expect(screen.getByRole('button', { name: /close preview/i })).toBeInTheDocument());
   });
 
   it('should close the preview when Escape is pressed', async () => {
     const user = userEvent.setup();
-    const records = [makeFlat('/Photos/Lyon', 'a.jpg', 'keep')];
-    render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+    useAppStore.setState({ flaggedRecords: [makeFlat('/Photos/Lyon', 'a.jpg', 'keep')] });
+    render(<FlaggedView {...DEFAULT_PROPS} />);
     await user.click(screen.getByRole('button', { name: 'a.jpg' }));
     await waitFor(() => expect(screen.getByRole('button', { name: /close preview/i })).toBeInTheDocument());
     await user.keyboard('{Escape}');
@@ -151,49 +153,52 @@ describe('FlaggedView', () => {
 
   describe('Create Group button', () => {
     it('should not render Create Group button on the All filter', async () => {
-      const records = [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')];
-      render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+      useAppStore.setState({ flaggedRecords: [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')] });
+      render(<FlaggedView {...DEFAULT_PROPS} />);
       expect(screen.queryByRole('button', { name: 'Create Group' })).not.toBeInTheDocument();
     });
 
     it('should not render Create Group button on the Keep filter when there are zero keep records', async () => {
       const user = userEvent.setup();
-      const records = [makeFlat('/Photos/Lyon', 'discard.jpg', 'discard')];
-      render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+      useAppStore.setState({ flaggedRecords: [makeFlat('/Photos/Lyon', 'discard.jpg', 'discard')] });
+      render(<FlaggedView {...DEFAULT_PROPS} />);
       await user.click(screen.getByRole('button', { name: 'Keep' }));
       expect(screen.queryByRole('button', { name: 'Create Group' })).not.toBeInTheDocument();
     });
 
     it('should render Create Group button on the Keep filter when ≥1 keep record exists', async () => {
       const user = userEvent.setup();
-      const records = [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')];
-      render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+      useAppStore.setState({ flaggedRecords: [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')] });
+      render(<FlaggedView {...DEFAULT_PROPS} />);
       await user.click(screen.getByRole('button', { name: 'Keep' }));
       expect(screen.getByRole('button', { name: 'Create Group' })).toBeInTheDocument();
     });
 
     it('should open the modal when Create Group is clicked', async () => {
       const user = userEvent.setup();
-      const records = [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')];
-      render(<FlaggedView {...DEFAULT_PROPS} records={records} />);
+      useAppStore.setState({ flaggedRecords: [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')] });
+      render(<FlaggedView {...DEFAULT_PROPS} />);
       await user.click(screen.getByRole('button', { name: 'Keep' }));
       await user.click(screen.getByRole('button', { name: 'Create Group' }));
       expect(screen.getByTestId('create-group-modal')).toBeInTheDocument();
     });
 
-    it('should call onCreateGroup with the visible keep photos when the modal submits', async () => {
-      const onCreateGroup = vi.fn().mockResolvedValue(undefined);
+    it('should call store createGroup with the visible keep photos when the modal submits', async () => {
+      const createGroupSpy = vi.fn().mockResolvedValue(undefined);
+      useAppStore.setState({
+        flaggedRecords: [
+          makeFlat('/Photos/Lyon', 'keep.jpg', 'keep'),
+          makeFlat('/Photos/Paris', 'keep2.jpg', 'keep'),
+        ],
+        createGroup: createGroupSpy,
+      });
       const user = userEvent.setup();
-      const records = [
-        makeFlat('/Photos/Lyon', 'keep.jpg', 'keep'),
-        makeFlat('/Photos/Paris', 'keep2.jpg', 'keep'),
-      ];
-      render(<FlaggedView {...DEFAULT_PROPS} records={records} onCreateGroup={onCreateGroup} />);
+      render(<FlaggedView {...DEFAULT_PROPS} />);
       await user.click(screen.getByRole('button', { name: 'Keep' }));
       await user.click(screen.getByRole('button', { name: 'Create Group' }));
       await user.click(screen.getByRole('button', { name: 'Submit modal' }));
-      expect(onCreateGroup).toHaveBeenCalledOnce();
-      const call = onCreateGroup.mock.calls[0][0];
+      expect(createGroupSpy).toHaveBeenCalledOnce();
+      const call = createGroupSpy.mock.calls[0][0];
       expect(call.name).toBe('Test Group');
       expect(call.photos).toHaveLength(2);
       expect(call.photos.map((p: { key: string }) => p.key)).toContain('/photos/lyon/keep.jpg');

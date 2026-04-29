@@ -1,21 +1,11 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GroupsView } from './GroupsView';
+import { useAppStore, _resetStoreForTesting, createThumbnailCache } from './store';
 import type { Group } from './groups';
-import type { FlatRecord } from './useAllFlagged';
-import type { ThumbnailCache } from './useThumbnailCache';
-
-const LOADING_STATE = { tag: 'loading' as const };
-
-function makeCache(): ThumbnailCache {
-  return {
-    peek: () => LOADING_STATE,
-    subscribe: () => () => {},
-    request: vi.fn(),
-  };
-}
+import type { FlatRecord } from './store';
 
 function makeGroup(overrides: Partial<Group> & { id: string; name: string }): Group {
   return {
@@ -44,7 +34,6 @@ const EXTRA_PROPS = {
   isActive: false as boolean,
   previewWidth: 480,
   onPreviewResize: () => {},
-  onDeleteGroup: vi.fn().mockResolvedValue(undefined),
 };
 
 beforeAll(() => {
@@ -63,18 +52,31 @@ beforeAll(() => {
   };
 });
 
+beforeEach(() => {
+  _resetStoreForTesting();
+  useAppStore.setState({
+    groups: [],
+    recordsByGroupId: new Map(),
+    cache: createThumbnailCache(),
+    groupedLoading: false,
+  });
+});
+
 describe('GroupsView', () => {
   it('should render empty-state copy when no groups exist', () => {
-    render(
-      <GroupsView
-        groups={[]}
-        recordsByGroupId={new Map()}
-        cache={makeCache()}
-        loading={false}
-        {...EXTRA_PROPS}
-      />,
-    );
+    render(<GroupsView {...EXTRA_PROPS} />);
     expect(screen.getByText(/No groups yet/)).toBeTruthy();
+  });
+
+  it('renders the correct group list when the store is seeded', () => {
+    const groups = [
+      makeGroup({ id: 'g1', name: 'Eiffel Tower' }),
+      makeGroup({ id: 'g2', name: 'Colosseum' }),
+    ];
+    useAppStore.setState({ groups, recordsByGroupId: new Map() });
+    render(<GroupsView {...EXTRA_PROPS} />);
+    expect(screen.getByText('Eiffel Tower')).toBeTruthy();
+    expect(screen.getByText('Colosseum')).toBeTruthy();
   });
 
   it('should render one card per group', () => {
@@ -82,29 +84,15 @@ describe('GroupsView', () => {
       makeGroup({ id: 'g1', name: 'Eiffel Tower' }),
       makeGroup({ id: 'g2', name: 'Colosseum' }),
     ];
-    render(
-      <GroupsView
-        groups={groups}
-        recordsByGroupId={new Map()}
-        cache={makeCache()}
-        loading={false}
-        {...EXTRA_PROPS}
-      />,
-    );
+    useAppStore.setState({ groups, recordsByGroupId: new Map() });
+    render(<GroupsView {...EXTRA_PROPS} />);
     expect(screen.getByText('Eiffel Tower')).toBeTruthy();
     expect(screen.getByText('Colosseum')).toBeTruthy();
   });
 
-  it('should show loading state when loading is true', () => {
-    render(
-      <GroupsView
-        groups={[]}
-        recordsByGroupId={new Map()}
-        cache={makeCache()}
-        loading={true}
-        {...EXTRA_PROPS}
-      />,
-    );
+  it('should show loading state when groupedLoading is true', () => {
+    useAppStore.setState({ groupedLoading: true });
+    render(<GroupsView {...EXTRA_PROPS} />);
     expect(screen.getByText('Loading…')).toBeTruthy();
   });
 
@@ -118,15 +106,8 @@ describe('GroupsView', () => {
       ['g1', [makeRecord('a', 'g1')]],
       ['g2', [makeRecord('b', 'g2'), makeRecord('c', 'g2'), makeRecord('d', 'g2')]],
     ]);
-    render(
-      <GroupsView
-        groups={groups}
-        recordsByGroupId={recordsByGroupId}
-        cache={makeCache()}
-        loading={false}
-        {...EXTRA_PROPS}
-      />,
-    );
+    useAppStore.setState({ groups, recordsByGroupId });
+    render(<GroupsView {...EXTRA_PROPS} />);
 
     // Default sort: newest first → Beta (2026-03) before Alpha (2026-01)
     const cards = screen.getAllByRole('article');
@@ -150,15 +131,8 @@ describe('GroupsView', () => {
     const user = userEvent.setup();
     const group = makeGroup({ id: 'g1', name: 'Eiffel Tower', locationName: 'Paris, France' });
     const recordsByGroupId = new Map([['g1', [makeRecord('a', 'g1')]]]);
-    render(
-      <GroupsView
-        groups={[group]}
-        recordsByGroupId={recordsByGroupId}
-        cache={makeCache()}
-        loading={false}
-        {...EXTRA_PROPS}
-      />,
-    );
+    useAppStore.setState({ groups: [group], recordsByGroupId });
+    render(<GroupsView {...EXTRA_PROPS} />);
 
     await user.click(screen.getByRole('article', { name: 'Eiffel Tower' }));
 
@@ -170,15 +144,8 @@ describe('GroupsView', () => {
     const user = userEvent.setup();
     const group = makeGroup({ id: 'g1', name: 'Eiffel Tower', locationName: 'Paris, France' });
     const recordsByGroupId = new Map([['g1', [makeRecord('a', 'g1')]]]);
-    render(
-      <GroupsView
-        groups={[group]}
-        recordsByGroupId={recordsByGroupId}
-        cache={makeCache()}
-        loading={false}
-        {...EXTRA_PROPS}
-      />,
-    );
+    useAppStore.setState({ groups: [group], recordsByGroupId });
+    render(<GroupsView {...EXTRA_PROPS} />);
 
     await user.click(screen.getByRole('article', { name: 'Eiffel Tower' }));
     expect(screen.getByRole('button', { name: /back to groups/i })).toBeInTheDocument();
@@ -192,54 +159,33 @@ describe('GroupsView', () => {
     const user = userEvent.setup();
     const group = makeGroup({ id: 'g1', name: 'Eiffel Tower', locationName: 'Paris, France' });
     const recordsByGroupId = new Map([['g1', [makeRecord('a', 'g1'), makeRecord('b', 'g1')]]]);
-    render(
-      <GroupsView
-        groups={[group]}
-        recordsByGroupId={recordsByGroupId}
-        cache={makeCache()}
-        loading={false}
-        {...EXTRA_PROPS}
-      />,
-    );
+    useAppStore.setState({ groups: [group], recordsByGroupId });
+    render(<GroupsView {...EXTRA_PROPS} />);
     await user.click(screen.getByRole('button', { name: 'Delete group "Eiffel Tower"' }));
     expect(screen.getByText('Delete "Eiffel Tower"?')).toBeInTheDocument();
     expect(screen.getByText('The 2 photos will return to unprocessed state.')).toBeInTheDocument();
   });
 
-  it('should call onDeleteGroup(id) exactly once when the modal Delete is confirmed', async () => {
+  it('should call the store deleteGroup action exactly once when the modal Delete is confirmed', async () => {
     const user = userEvent.setup();
-    const onDeleteGroup = vi.fn().mockResolvedValue(undefined);
     const group = makeGroup({ id: 'g1', name: 'Eiffel Tower', locationName: 'Paris, France' });
-    render(
-      <GroupsView
-        groups={[group]}
-        recordsByGroupId={new Map([['g1', [makeRecord('a', 'g1')]]])}
-        cache={makeCache()}
-        loading={false}
-        {...EXTRA_PROPS}
-        onDeleteGroup={onDeleteGroup}
-      />,
-    );
+    const deleteSpy = vi.fn().mockResolvedValue(undefined);
+    useAppStore.setState({ groups: [group], recordsByGroupId: new Map([['g1', [makeRecord('a', 'g1')]]]), deleteGroup: deleteSpy });
+
+    render(<GroupsView {...EXTRA_PROPS} />);
     await user.click(screen.getByRole('button', { name: 'Delete group "Eiffel Tower"' }));
     await user.click(screen.getByRole('button', { name: 'Delete' }));
-    await waitFor(() => expect(onDeleteGroup).toHaveBeenCalledWith('g1'));
-    expect(onDeleteGroup).toHaveBeenCalledOnce();
+    await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith('g1'));
+    expect(deleteSpy).toHaveBeenCalledOnce();
   });
 
   it('should close the modal and return to the list after deleting from detail view', async () => {
     const user = userEvent.setup();
-    const onDeleteGroup = vi.fn().mockResolvedValue(undefined);
     const group = makeGroup({ id: 'g1', name: 'Eiffel Tower', locationName: 'Paris, France' });
-    render(
-      <GroupsView
-        groups={[group]}
-        recordsByGroupId={new Map([['g1', [makeRecord('a', 'g1')]]])}
-        cache={makeCache()}
-        loading={false}
-        {...EXTRA_PROPS}
-        onDeleteGroup={onDeleteGroup}
-      />,
-    );
+    useAppStore.setState({ groups: [group], recordsByGroupId: new Map([['g1', [makeRecord('a', 'g1')]]]), deleteGroup: vi.fn().mockResolvedValue(undefined) });
+
+    render(<GroupsView {...EXTRA_PROPS} />);
+
     // Navigate into detail view
     await user.click(screen.getByRole('article', { name: 'Eiffel Tower' }));
     expect(screen.getByRole('button', { name: /back to groups/i })).toBeInTheDocument();
@@ -250,10 +196,9 @@ describe('GroupsView', () => {
 
     // Confirm
     await user.click(screen.getByRole('button', { name: 'Delete' }));
-    await waitFor(() => expect(onDeleteGroup).toHaveBeenCalledWith('g1'));
+    await waitFor(() => expect(screen.queryByText('Delete "Eiffel Tower"?')).not.toBeInTheDocument());
 
-    // Modal should be gone and detail view reset (list view)
-    expect(screen.queryByText('Delete "Eiffel Tower"?')).not.toBeInTheDocument();
+    // Modal gone and detail view reset
     expect(screen.queryByRole('button', { name: /back to groups/i })).not.toBeInTheDocument();
   });
 });

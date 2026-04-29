@@ -1,7 +1,7 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, useSyncExternalStore, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { DropboxEntry, DropboxFile } from '../dropbox/client';
-import type { ThumbnailCache } from './useThumbnailCache';
+import type { ThumbnailCache } from './store';
 import { ThumbnailCell } from './ThumbnailCell';
 import type { CurationFlags } from './curation';
 import {
