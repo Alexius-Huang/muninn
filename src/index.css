@@ -100,13 +100,17 @@ html, body, #root {
   overflow: hidden;
   background: var(--color-nord-2);
   border: 2px solid var(--color-nord-3);
-  padding: 2px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.5);
   flex-shrink: 0;
   position: relative;
   z-index: 1;
 }
-.muninn-pin__head img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.muninn-pin__head img {
+  position: absolute;
+  inset: 2px;
+  object-fit: cover;
+  display: block;
+}
 .muninn-pin__tail {
   display: block;
   margin-top: -2px;
