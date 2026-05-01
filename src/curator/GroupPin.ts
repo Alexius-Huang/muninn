@@ -14,8 +14,8 @@ export type GroupPinHandle = {
 };
 
 function buildIconHtml(state: 'loading' | 'success' | 'error' | 'empty', dataUrl?: string): string {
-  const imgHtml = state === 'success' && dataUrl ? `<img src="${dataUrl}" alt="" />` : '';
-  return `<div class="muninn-pin" data-state="${state}"><div class="muninn-pin__head">${imgHtml}</div><svg class="muninn-pin__tail" width="12" height="18" viewBox="0 0 12 18" aria-hidden="true"><polygon points="0,0 12,0 6,18" /></svg></div>`;
+  const bgStyle = state === 'success' && dataUrl ? ` style="background-image: url('${dataUrl}')"` : '';
+  return `<div class="muninn-pin" data-state="${state}"><div class="muninn-pin__head"${bgStyle}></div><svg class="muninn-pin__tail" width="12" height="18" viewBox="0 0 12 18" aria-hidden="true"><polygon points="0,0 12,0 6,18" /></svg></div>`;
 }
 
 function buildDivIcon(html: string): L.DivIcon {

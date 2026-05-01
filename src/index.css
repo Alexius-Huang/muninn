@@ -99,17 +99,14 @@ html, body, #root {
   border-radius: 9999px;
   overflow: hidden;
   background: var(--color-nord-2);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   border: 2px solid var(--color-nord-3);
   box-shadow: 0 2px 8px rgba(0,0,0,0.5);
   flex-shrink: 0;
   position: relative;
   z-index: 1;
-}
-.muninn-pin__head img {
-  position: absolute;
-  inset: 2px;
-  object-fit: cover;
-  display: block;
 }
 .muninn-pin__tail {
   display: block;

@@ -88,7 +88,7 @@ describe('createGroupPinMarker', () => {
     const calls = (L.divIcon as ReturnType<typeof vi.fn>).mock.calls;
     const lastHtml = (calls[calls.length - 1][0] as { html: string }).html;
     expect(lastHtml).toContain('data-state="loading"');
-    expect(lastHtml).not.toContain('<img');
+    expect(lastHtml).not.toContain('background-image');
   });
 
   it('should request the first photo\'s pathDisplay from the cache on creation', () => {
@@ -105,7 +105,7 @@ describe('createGroupPinMarker', () => {
     expect(cache.subscribe).toHaveBeenCalledWith('/photos/sunset.jpg', expect.any(Function));
   });
 
-  it('should re-render the icon with an <img src=dataUrl> when the cache notifies success', () => {
+  it('should re-render the icon with background-image style when the cache notifies success', () => {
     let notifyFn!: () => void;
     const cache = makeCache({
       subscribe: vi.fn((_: string, cb: () => void) => { notifyFn = cb; return vi.fn(); }),
@@ -117,7 +117,7 @@ describe('createGroupPinMarker', () => {
     notifyFn();
     const lastSetIconArg = mockSetIcon.mock.calls.slice(-1)[0][0] as { html: string };
     expect(lastSetIconArg.html).toContain('data-state="success"');
-    expect(lastSetIconArg.html).toContain('src="data:image/jpeg;base64,abc"');
+    expect(lastSetIconArg.html).toContain("background-image: url('data:image/jpeg;base64,abc')");
   });
 
   it('should re-render the icon with data-state="error" when the cache resolves to error', () => {
@@ -132,7 +132,7 @@ describe('createGroupPinMarker', () => {
     notifyFn();
     const lastSetIconArg = mockSetIcon.mock.calls.slice(-1)[0][0] as { html: string };
     expect(lastSetIconArg.html).toContain('data-state="error"');
-    expect(lastSetIconArg.html).not.toContain('<img');
+    expect(lastSetIconArg.html).not.toContain('background-image');
   });
 
   it('should bind a tooltip with the group name, top direction, muninn-pin-tooltip className', () => {
