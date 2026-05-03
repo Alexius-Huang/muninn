@@ -14,6 +14,7 @@ export type GroupPinHandle = {
 };
 
 function buildIconHtml(state: 'loading' | 'success' | 'error' | 'empty', dataUrl?: string): string {
+  // dataUrl must be a base64 data URL (no single-quote chars); raw interpolation into HTML attr is safe
   const bgStyle = state === 'success' && dataUrl ? ` style="background-image: url('${dataUrl}')"` : '';
   return `<div class="muninn-pin" data-state="${state}"><div class="muninn-pin__head"${bgStyle}></div><svg class="muninn-pin__tail" width="12" height="18" viewBox="0 0 12 18" aria-hidden="true"><polygon points="0,0 12,0 6,18" /></svg></div>`;
 }
