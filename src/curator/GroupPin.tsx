@@ -11,6 +11,7 @@ export type CreateGroupPinArgs = {
   cache: ThumbnailCache;
   records: FlatRecord[];
   onViewInGroups: (groupId: string) => void;
+  map: L.Map;
 };
 
 export type GroupPinHandle = {
@@ -27,7 +28,7 @@ function buildDivIcon(html: string): L.DivIcon {
   return L.divIcon({ html, className: '', iconSize: [60, 76], iconAnchor: [30, 76] });
 }
 
-export function createGroupPinMarker({ group, firstPhoto, cache, records, onViewInGroups }: CreateGroupPinArgs): GroupPinHandle {
+export function createGroupPinMarker({ group, firstPhoto, cache, records, onViewInGroups, map }: CreateGroupPinArgs): GroupPinHandle {
   const marker = L.marker([group.lat, group.lng]);
 
   marker.bindTooltip(group.name, {
@@ -43,13 +44,14 @@ export function createGroupPinMarker({ group, firstPhoto, cache, records, onView
     closeButton: false,
     className: 'muninn-pin-popup',
     maxWidth: 360,
-    offset: [0, -76] as L.PointExpression,
+    offset: [182, -40] as L.PointExpression,
   }).setContent(popupContainer);
   marker.bindPopup(popup);
 
   let root: ReturnType<typeof createRoot> | null = null;
 
   function onPopupOpen() {
+    map.panTo([group.lat, group.lng]);
     root = createRoot(popupContainer);
     root.render(
       createElement(GroupPinPopup, {

@@ -54,6 +54,7 @@ function MarkerClusterLayer({ groups }: { groups: Group[] }) {
         cache,
         records,
         onViewInGroups: viewGroupDetail,
+        map,
       });
       clusterGroup.addLayer(marker);
       cleanups.push(cleanup);

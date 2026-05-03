@@ -69,6 +69,7 @@ let mockClosePopup: ReturnType<typeof vi.fn>;
 let mockOn: ReturnType<typeof vi.fn>;
 let mockOff: ReturnType<typeof vi.fn>;
 let mockPopupSetContent: ReturnType<typeof vi.fn>;
+let mockPanTo: ReturnType<typeof vi.fn>;
 
 function makeDefaultArgs(overrides: Partial<Parameters<typeof createGroupPinMarker>[0]> = {}) {
   return {
@@ -77,6 +78,7 @@ function makeDefaultArgs(overrides: Partial<Parameters<typeof createGroupPinMark
     cache: makeCache(),
     records: [],
     onViewInGroups: vi.fn(),
+    map: { panTo: mockPanTo } as unknown as L.Map,
     ...overrides,
   };
 }
@@ -89,6 +91,7 @@ beforeEach(() => {
   mockOn = vi.fn();
   mockOff = vi.fn();
   mockPopupSetContent = vi.fn().mockReturnThis();
+  mockPanTo = vi.fn();
 
   mockCreateRoot.mockClear();
   mockRootRender.mockClear();
@@ -234,6 +237,17 @@ describe('createGroupPinMarker', () => {
 
     expect(mockCreateRoot).toHaveBeenCalledOnce();
     expect(mockRootRender).toHaveBeenCalledOnce();
+  });
+
+  it('should call map.panTo with the group lat/lng when popupopen fires', () => {
+    const eventHandlers: EventHandlerMap = {};
+    mockOn.mockImplementation((event: string, cb: () => void) => { eventHandlers[event] = cb; });
+    const group = makeGroup({ lat: 51.5, lng: -0.1 });
+
+    createGroupPinMarker(makeDefaultArgs({ group }));
+    eventHandlers['popupopen']?.();
+
+    expect(mockPanTo).toHaveBeenCalledWith([51.5, -0.1]);
   });
 
   it('should call root.unmount when popupclose fires', () => {

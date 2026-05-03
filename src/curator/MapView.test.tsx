@@ -6,6 +6,7 @@ const mockFitBounds = vi.fn();
 const mockInvalidateSize = vi.fn();
 const mockAddLayer = vi.fn();
 const mockRemoveLayer = vi.fn();
+const mockPanTo = vi.fn();
 
 vi.mock('leaflet.markercluster', () => ({}));
 
@@ -50,6 +51,7 @@ vi.mock('react-leaflet', () => ({
     invalidateSize: mockInvalidateSize,
     addLayer: mockAddLayer,
     removeLayer: mockRemoveLayer,
+    panTo: mockPanTo,
   }),
 }));
 
@@ -77,6 +79,7 @@ beforeEach(() => {
   mockInvalidateSize.mockReset();
   mockAddLayer.mockReset();
   mockRemoveLayer.mockReset();
+  mockPanTo.mockReset();
   mockCluster = { addLayer: vi.fn() };
   (L as unknown as Record<string, unknown>).markerClusterGroup = vi.fn(() => mockCluster);
   mockCreateGroupPinMarker.mockClear();
@@ -193,7 +196,7 @@ describe('MapView', () => {
     expect(mockAddLayer).toHaveBeenCalledWith(newCluster);
   });
 
-  it('should call createGroupPinMarker once per group, passing group, firstPhoto, records, cache, and onViewInGroups', async () => {
+  it('should call createGroupPinMarker once per group, passing group, firstPhoto, records, cache, map, and onViewInGroups', async () => {
     const groups = [makeGroup({ id: 'g1' }), makeGroup({ id: 'g2' })];
     useAppStore.setState({ groups });
     const { cache } = useAppStore.getState();
@@ -201,7 +204,7 @@ describe('MapView', () => {
     expect(mockCreateGroupPinMarker).toHaveBeenCalledTimes(groups.length);
     for (const group of groups) {
       expect(mockCreateGroupPinMarker).toHaveBeenCalledWith(
-        expect.objectContaining({ group, firstPhoto: null, cache, records: [], onViewInGroups: expect.any(Function) }),
+        expect.objectContaining({ group, firstPhoto: null, cache, records: [], map: expect.any(Object), onViewInGroups: expect.any(Function) }),
       );
     }
   });
