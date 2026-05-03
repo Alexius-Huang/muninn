@@ -1,39 +1,9 @@
-import { useEffect, useSyncExternalStore } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { Group } from './groups';
-import type { FlatRecord } from './store';
-import type { ThumbnailCache } from './store';
+import type { FlatRecord, ThumbnailCache } from './store';
+import { ThumbnailTile } from './ThumbnailTile';
 
-type MosaicCellProps = {
-  record: FlatRecord;
-  cache: ThumbnailCache;
-};
-
-function MosaicCell({ record, cache }: MosaicCellProps) {
-  const state = useSyncExternalStore(
-    (cb) => cache.subscribe(record.record.pathLower, cb),
-    () => cache.peek(record.record.pathLower),
-  );
-
-  useEffect(() => {
-    cache.request(record.record.pathDisplay);
-  }, [record.record.pathDisplay, cache]);
-
-  return (
-    <div
-      data-testid="mosaic-cell"
-      className="relative overflow-hidden bg-nord-2 w-full h-full"
-    >
-      {state.tag === 'success' && (
-        <img
-          src={state.dataUrl}
-          alt={record.record.name}
-          className="object-cover w-full h-full"
-        />
-      )}
-    </div>
-  );
-}
+const MosaicCell = ThumbnailTile;
 
 type Props = {
   group: Group;

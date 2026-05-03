@@ -195,6 +195,12 @@ type AppStore = {
 
   // thumbnail cache (non-reactive instance)
   cache: ThumbnailCache;
+
+  // Cross-tab navigation primitive (MUN-24, reused by MUN-43)
+  selectedGroupId: string | null;
+  setSelectedGroupId: (id: string | null) => void;
+  groupNavSeq: number;  // monotonically incremented by viewGroupDetail; always changes so effect re-fires
+  viewGroupDetail: (groupId: string) => void;
 };
 
 // Mutable state that lives outside the Zustand reactive graph — same semantics
@@ -367,6 +373,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
   // Cache
   // ---------------------------------------------------------------------------
   cache: createThumbnailCache(),
+
+  // ---------------------------------------------------------------------------
+  // Cross-tab navigation
+  // ---------------------------------------------------------------------------
+  selectedGroupId: null,
+  groupNavSeq: 0,
+
+  setSelectedGroupId(id) {
+    set({ selectedGroupId: id });
+  },
+
+  viewGroupDetail(groupId) {
+    set((s) => ({ selectedGroupId: groupId, groupNavSeq: s.groupNavSeq + 1 }));
+  },
 }));
 
 export function _resetStoreForTesting() {
@@ -380,6 +400,8 @@ export function _resetStoreForTesting() {
     flaggedRecords: [],
     flaggedLoading: false,
     cache: createThumbnailCache(),
+    selectedGroupId: null,
+    groupNavSeq: 0,
   });
 }
 

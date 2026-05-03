@@ -39,14 +39,23 @@ function MarkerClusterLayer({ groups }: { groups: Group[] }) {
   const map = useMap();
   const recordsByGroupId = useAppStore((s) => s.recordsByGroupId);
   const cache = useAppStore((s) => s.cache);
+  const viewGroupDetail = useAppStore((s) => s.viewGroupDetail);
 
   useEffect(() => {
     const clusterGroup = L.markerClusterGroup();
     const cleanups: (() => void)[] = [];
 
     for (const group of groups) {
-      const firstPhoto = recordsByGroupId.get(group.id)?.[0] ?? null;
-      const { marker, cleanup } = createGroupPinMarker({ group, firstPhoto, cache });
+      const records = recordsByGroupId.get(group.id) ?? [];
+      const firstPhoto = records[0] ?? null;
+      const { marker, cleanup } = createGroupPinMarker({
+        group,
+        firstPhoto,
+        cache,
+        records,
+        onViewInGroups: viewGroupDetail,
+        map,
+      });
       clusterGroup.addLayer(marker);
       cleanups.push(cleanup);
     }
@@ -56,7 +65,7 @@ function MarkerClusterLayer({ groups }: { groups: Group[] }) {
       for (const cleanup of cleanups) cleanup();
       map.removeLayer(clusterGroup);
     };
-  }, [map, groups, recordsByGroupId, cache]);
+  }, [map, groups, recordsByGroupId, cache, viewGroupDetail]);
 
   return null;
 }

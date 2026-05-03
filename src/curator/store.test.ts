@@ -339,3 +339,48 @@ describe('useAppStore — cache', () => {
     expect(cache.peek('/photos/a.jpg')).toEqual({ tag: 'success', dataUrl: 'data:image/jpeg;base64,ok' });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Cross-tab navigation
+// ---------------------------------------------------------------------------
+
+describe('useAppStore — cross-tab navigation', () => {
+  it('should initialise selectedGroupId to null', () => {
+    expect(useAppStore.getState().selectedGroupId).toBeNull();
+  });
+
+  it('should initialise groupNavSeq to 0', () => {
+    expect(useAppStore.getState().groupNavSeq).toBe(0);
+  });
+
+  it('should update selectedGroupId via setSelectedGroupId', () => {
+    useAppStore.getState().setSelectedGroupId('g1');
+    expect(useAppStore.getState().selectedGroupId).toBe('g1');
+  });
+
+  it('should clear selectedGroupId when setSelectedGroupId is called with null', () => {
+    useAppStore.getState().setSelectedGroupId('g1');
+    useAppStore.getState().setSelectedGroupId(null);
+    expect(useAppStore.getState().selectedGroupId).toBeNull();
+  });
+
+  it('should set selectedGroupId and increment groupNavSeq via viewGroupDetail', () => {
+    useAppStore.getState().viewGroupDetail('g2');
+    expect(useAppStore.getState().selectedGroupId).toBe('g2');
+    expect(useAppStore.getState().groupNavSeq).toBe(1);
+  });
+
+  it('should increment groupNavSeq each time viewGroupDetail is called, even for the same group', () => {
+    useAppStore.getState().viewGroupDetail('g1');
+    useAppStore.getState().viewGroupDetail('g1');
+    expect(useAppStore.getState().groupNavSeq).toBe(2);
+    expect(useAppStore.getState().selectedGroupId).toBe('g1');
+  });
+
+  it('should reset selectedGroupId and groupNavSeq after _resetStoreForTesting', () => {
+    useAppStore.getState().viewGroupDetail('g99');
+    _resetStoreForTesting();
+    expect(useAppStore.getState().selectedGroupId).toBeNull();
+    expect(useAppStore.getState().groupNavSeq).toBe(0);
+  });
+});

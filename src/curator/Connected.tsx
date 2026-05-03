@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DropboxAccount, DropboxEntry } from '../dropbox/client';
 import { disconnect } from '../auth/dropboxAuth';
 import { FolderTree } from './FolderTree';
@@ -50,6 +50,8 @@ export function Connected({ account, onDisconnect }: Props) {
   const pendingTabRef = useRef<'browse' | 'flagged' | 'groups' | 'map' | null>(null);
 
   const { groups, loadGroups, loadFlagged, loadGrouped, flushFlagged, flushGrouped } = useAppStore();
+  const selectedGroupId = useAppStore((s) => s.selectedGroupId);
+  const groupNavSeq = useAppStore((s) => s.groupNavSeq);
 
   useEffect(() => {
     void loadGroups();
@@ -151,22 +153,35 @@ export function Connected({ account, onDisconnect }: Props) {
     return { name: group.name, locationName: group.locationName };
   })();
 
+  const handleTabChangeRef = useRef<(target: 'browse' | 'flagged' | 'groups' | 'map') => Promise<void>>(async () => {});
+
+  const handleTabChange = useCallback(async (target: 'browse' | 'flagged' | 'groups' | 'map') => {
+    if (target === tab || target === pendingTabRef.current) return;
+    pendingTabRef.current = target;
+    if (tab === 'browse') await flushBrowse();
+    if (tab === 'flagged') await flushFlagged();
+    if (tab === 'groups') await flushGrouped();
+    if (target === 'flagged') await loadFlagged();
+    if (target === 'browse') await reloadBrowse();
+    if (target === 'groups') await loadGrouped();
+    pendingTabRef.current = null;
+    setTab(target);
+  }, [tab, flushBrowse, flushFlagged, flushGrouped, loadFlagged, reloadBrowse, loadGrouped]);
+  handleTabChangeRef.current = handleTabChange;
+
+  // When the map popup (or other external trigger) calls viewGroupDetail, switch to Groups tab.
+  // Watch groupNavSeq (not selectedGroupId) so this fires even when the same group is re-selected.
+  // groupNavSeq === 0 is the initial mount state; skip it to avoid an spurious switch on load.
+  useEffect(() => {
+    if (groupNavSeq > 0) {
+      void handleTabChangeRef.current('groups');
+    }
+  }, [groupNavSeq]);
+
   return (
     <Tabs
       value={tab}
-      onValueChange={async (next) => {
-        const target = next as 'browse' | 'flagged' | 'groups' | 'map';
-        if (target === tab || target === pendingTabRef.current) return;
-        pendingTabRef.current = target;
-        if (tab === 'browse') await flushBrowse();
-        if (tab === 'flagged') await flushFlagged();
-        if (tab === 'groups') await flushGrouped();
-        if (target === 'flagged') await loadFlagged();
-        if (target === 'browse') await reloadBrowse();
-        if (target === 'groups') await loadGrouped();
-        pendingTabRef.current = null;
-        setTab(target);
-      }}
+      onValueChange={(next) => { void handleTabChange(next as 'browse' | 'flagged' | 'groups' | 'map'); }}
       className="h-full bg-nord-0 gap-0"
     >
       <header className="flex items-stretch justify-between px-6 h-12 bg-nord-1 border-b border-nord-3 shrink-0">
