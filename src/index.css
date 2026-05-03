@@ -76,3 +76,57 @@ html, body, #root {
 .muninn-map.leaflet-container {
   background: #3b4252;
 }
+
+.muninn-pin {
+  position: relative;
+  width: 60px;
+  height: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 150ms ease-out;
+  transform-origin: 50% 100%;
+  cursor: pointer;
+}
+.muninn-pin:hover { transform: scale(1.22); }
+@media (prefers-reduced-motion: reduce) {
+  .muninn-pin { transition: none; }
+  .muninn-pin:hover { transform: none; }
+}
+.muninn-pin__head {
+  width: 60px;
+  height: 60px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: var(--color-nord-2);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 2px solid var(--color-nord-3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.muninn-pin__tail {
+  display: block;
+  margin-top: -2px;
+}
+.muninn-pin__tail polygon {
+  fill: var(--color-nord-1);
+  stroke: var(--color-nord-3);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.leaflet-tooltip.muninn-pin-tooltip {
+  background: var(--color-nord-1);
+  color: var(--color-nord-6);
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+.leaflet-tooltip.muninn-pin-tooltip::before { display: none; }
