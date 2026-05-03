@@ -10,7 +10,7 @@ type PanelState = 'loading' | 'unconfigured' | 'ready';
 
 type PingResult = { ok: true; detail: string } | { ok: false; error: string };
 
-export function CfDebugPanel() {
+export function ConfigurationPanel() {
   const [panelState, setPanelState] = useState<PanelState>('loading');
   const [auth, setAuth] = useState<CfAuth | null>(null);
 

@@ -4,7 +4,7 @@ import { validateToken, DropboxNetworkError } from './dropbox/client';
 import type { DropboxAccount } from './dropbox/client';
 import { SetupScreen } from './auth/SetupScreen';
 import { Connected } from './curator/Connected';
-import { CfDebugPanel } from './cloud/CfDebugPanel';
+import { ConfigurationPanel } from './cloud/ConfigurationPanel';
 
 type AppState =
   | { status: 'loading' }
@@ -75,7 +75,7 @@ function MainApp() {
 function App() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('cf') === 'debug') {
-    return <CfDebugPanel />;
+    return <ConfigurationPanel />;
   }
   return <MainApp />;
 }

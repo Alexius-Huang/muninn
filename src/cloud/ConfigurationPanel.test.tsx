@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { CfDebugPanel } from './CfDebugPanel';
+import { ConfigurationPanel } from './ConfigurationPanel';
 
 const { mockGetCfAuth, mockSetCfAuth, mockDeleteCfAuth } = vi.hoisted(() => ({
   mockGetCfAuth: vi.fn(),
@@ -48,10 +48,10 @@ beforeEach(() => {
   mockGetObject.mockReset();
 });
 
-describe('CfDebugPanel', () => {
+describe('ConfigurationPanel', () => {
   it('renders setup form when no credentials are stored', async () => {
     mockGetCfAuth.mockResolvedValue(null);
-    render(<CfDebugPanel />);
+    render(<ConfigurationPanel />);
     await waitFor(() => {
       expect(screen.getByLabelText('Account ID')).toBeInTheDocument();
     });
@@ -64,7 +64,7 @@ describe('CfDebugPanel', () => {
     mockSetCfAuth.mockResolvedValue(undefined);
     const user = userEvent.setup();
 
-    render(<CfDebugPanel />);
+    render(<ConfigurationPanel />);
     await waitFor(() => screen.getByLabelText('Account ID'));
 
     await user.clear(screen.getByLabelText('Account ID'));
@@ -87,7 +87,7 @@ describe('CfDebugPanel', () => {
 
   it('shows "Credentials present" and ping buttons when credentials are stored', async () => {
     mockGetCfAuth.mockResolvedValue(STORED_AUTH);
-    render(<CfDebugPanel />);
+    render(<ConfigurationPanel />);
     await waitFor(() => {
       expect(screen.getByText(/credentials present/i)).toBeInTheDocument();
     });
@@ -102,7 +102,7 @@ describe('CfDebugPanel', () => {
       .mockResolvedValueOnce([{ id: 'debug-123', name: 'ping', lat: 0, lng: 0 }]);
     const user = userEvent.setup();
 
-    render(<CfDebugPanel />);
+    render(<ConfigurationPanel />);
     await waitFor(() => screen.getByRole('button', { name: /ping d1/i }));
 
     await user.click(screen.getByRole('button', { name: /ping d1/i }));
@@ -118,7 +118,7 @@ describe('CfDebugPanel', () => {
     mockGetObject.mockResolvedValue(new Blob(['\x00']));
     const user = userEvent.setup();
 
-    render(<CfDebugPanel />);
+    render(<ConfigurationPanel />);
     await waitFor(() => screen.getByRole('button', { name: /ping r2/i }));
 
     await user.click(screen.getByRole('button', { name: /ping r2/i }));
@@ -133,7 +133,7 @@ describe('CfDebugPanel', () => {
     mockD1Query.mockRejectedValue(new Error('D1 error: table not found'));
     const user = userEvent.setup();
 
-    render(<CfDebugPanel />);
+    render(<ConfigurationPanel />);
     await waitFor(() => screen.getByRole('button', { name: /ping d1/i }));
 
     await user.click(screen.getByRole('button', { name: /ping d1/i }));

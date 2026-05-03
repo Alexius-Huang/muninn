@@ -15,7 +15,7 @@ import { GroupsView } from './GroupsView';
 import { MapView } from './MapView';
 import { useAppStore } from './store';
 import { Settings, X } from 'lucide-react';
-import { CfDebugPanel } from '../cloud/CfDebugPanel';
+import { ConfigurationPanel } from '../cloud/ConfigurationPanel';
 
 type Props = {
   account: DropboxAccount;
@@ -352,7 +352,7 @@ export function Connected({ account, onDisconnect }: Props) {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <CfDebugPanel />
+            <ConfigurationPanel />
           </div>
         </div>
       )}
