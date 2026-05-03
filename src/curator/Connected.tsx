@@ -51,6 +51,7 @@ export function Connected({ account, onDisconnect }: Props) {
 
   const { groups, loadGroups, loadFlagged, loadGrouped, flushFlagged, flushGrouped } = useAppStore();
   const selectedGroupId = useAppStore((s) => s.selectedGroupId);
+  const setSelectedGroupId = useAppStore((s) => s.setSelectedGroupId);
 
   useEffect(() => {
     void loadGroups();
@@ -166,11 +167,14 @@ export function Connected({ account, onDisconnect }: Props) {
   }, [tab, flushBrowse, flushFlagged, flushGrouped, loadFlagged, reloadBrowse, loadGrouped]);
 
   // When the map popup (or other external trigger) calls viewGroupDetail, switch to Groups tab.
+  // Clear selectedGroupId immediately so this effect doesn't re-fire when the user later changes tabs
+  // (handleTabChange is recreated on every tab change, which would otherwise re-trigger this effect).
   useEffect(() => {
     if (selectedGroupId !== null) {
+      setSelectedGroupId(null);
       void handleTabChange('groups');
     }
-  }, [selectedGroupId, handleTabChange]);
+  }, [selectedGroupId, handleTabChange, setSelectedGroupId]);
 
   return (
     <Tabs
