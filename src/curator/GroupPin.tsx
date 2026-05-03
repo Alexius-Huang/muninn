@@ -1,11 +1,16 @@
+import { createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import L from 'leaflet';
 import type { Group } from './groups';
 import type { ThumbnailCache, FlatRecord } from './store';
+import { GroupPinPopup } from './GroupPinPopup';
 
 export type CreateGroupPinArgs = {
   group: Group;
   firstPhoto: FlatRecord | null;
   cache: ThumbnailCache;
+  records: FlatRecord[];
+  onViewInGroups: (groupId: string) => void;
 };
 
 export type GroupPinHandle = {
@@ -22,7 +27,7 @@ function buildDivIcon(html: string): L.DivIcon {
   return L.divIcon({ html, className: '', iconSize: [60, 76], iconAnchor: [30, 76] });
 }
 
-export function createGroupPinMarker({ group, firstPhoto, cache }: CreateGroupPinArgs): GroupPinHandle {
+export function createGroupPinMarker({ group, firstPhoto, cache, records, onViewInGroups }: CreateGroupPinArgs): GroupPinHandle {
   const marker = L.marker([group.lat, group.lng]);
 
   marker.bindTooltip(group.name, {
@@ -32,9 +37,50 @@ export function createGroupPinMarker({ group, firstPhoto, cache }: CreateGroupPi
     className: 'muninn-pin-tooltip',
   });
 
+  // Popup setup
+  const popupContainer = document.createElement('div');
+  const popup = L.popup({
+    closeButton: false,
+    className: 'muninn-pin-popup',
+    maxWidth: 360,
+    offset: [0, -76] as L.PointExpression,
+  }).setContent(popupContainer);
+  marker.bindPopup(popup);
+
+  let root: ReturnType<typeof createRoot> | null = null;
+
+  function onPopupOpen() {
+    root = createRoot(popupContainer);
+    root.render(
+      createElement(GroupPinPopup, {
+        group,
+        records,
+        cache,
+        onViewInGroups: () => onViewInGroups(group.id),
+      }),
+    );
+  }
+
+  function onPopupClose() {
+    root?.unmount();
+    root = null;
+  }
+
+  marker.on('popupopen', onPopupOpen);
+  marker.on('popupclose', onPopupClose);
+
   if (!firstPhoto) {
     marker.setIcon(buildDivIcon(buildIconHtml('empty')));
-    return { marker, cleanup: () => {} };
+    return {
+      marker,
+      cleanup: () => {
+        marker.closePopup();
+        root?.unmount();
+        root = null;
+        marker.off('popupopen', onPopupOpen);
+        marker.off('popupclose', onPopupClose);
+      },
+    };
   }
 
   const { pathDisplay, pathLower } = firstPhoto.record;
@@ -54,5 +100,15 @@ export function createGroupPinMarker({ group, firstPhoto, cache }: CreateGroupPi
   refresh();
   const unsubscribe = cache.subscribe(pathLower, refresh);
 
-  return { marker, cleanup: unsubscribe };
+  return {
+    marker,
+    cleanup: () => {
+      marker.closePopup();
+      root?.unmount();
+      root = null;
+      marker.off('popupopen', onPopupOpen);
+      marker.off('popupclose', onPopupClose);
+      unsubscribe();
+    },
+  };
 }

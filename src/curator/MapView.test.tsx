@@ -193,27 +193,29 @@ describe('MapView', () => {
     expect(mockAddLayer).toHaveBeenCalledWith(newCluster);
   });
 
-  it('should call createGroupPinMarker once per group, passing group, firstPhoto, and cache', async () => {
+  it('should call createGroupPinMarker once per group, passing group, firstPhoto, records, cache, and onViewInGroups', async () => {
     const groups = [makeGroup({ id: 'g1' }), makeGroup({ id: 'g2' })];
     useAppStore.setState({ groups });
     const { cache } = useAppStore.getState();
     await act(async () => { render(<MapView />); });
     expect(mockCreateGroupPinMarker).toHaveBeenCalledTimes(groups.length);
     for (const group of groups) {
-      expect(mockCreateGroupPinMarker).toHaveBeenCalledWith({ group, firstPhoto: null, cache });
+      expect(mockCreateGroupPinMarker).toHaveBeenCalledWith(
+        expect.objectContaining({ group, firstPhoto: null, cache, records: [], onViewInGroups: expect.any(Function) }),
+      );
     }
   });
 
-  it('should pass null as firstPhoto when recordsByGroupId has no entry for a group', async () => {
+  it('should pass null as firstPhoto and empty records when recordsByGroupId has no entry for a group', async () => {
     const group = makeGroup({ id: 'g1' });
     useAppStore.setState({ groups: [group], recordsByGroupId: new Map() });
     await act(async () => { render(<MapView />); });
     expect(mockCreateGroupPinMarker).toHaveBeenCalledWith(
-      expect.objectContaining({ firstPhoto: null }),
+      expect.objectContaining({ firstPhoto: null, records: [] }),
     );
   });
 
-  it('should pass the first FlatRecord from recordsByGroupId when records exist', async () => {
+  it('should pass the first FlatRecord as firstPhoto and full records array when records exist', async () => {
     const group = makeGroup({ id: 'g1' });
     const photo: FlatRecord = {
       folderPath: '/Photos',
@@ -231,8 +233,18 @@ describe('MapView', () => {
     });
     await act(async () => { render(<MapView />); });
     expect(mockCreateGroupPinMarker).toHaveBeenCalledWith(
-      expect.objectContaining({ firstPhoto: photo }),
+      expect.objectContaining({ firstPhoto: photo, records: [photo, extra] }),
     );
+  });
+
+  it('should pass viewGroupDetail from the store as the onViewInGroups callback', async () => {
+    const viewGroupDetailSpy = vi.fn();
+    const group = makeGroup({ id: 'g1' });
+    useAppStore.setState({ groups: [group], viewGroupDetail: viewGroupDetailSpy });
+    await act(async () => { render(<MapView />); });
+    const call = mockCreateGroupPinMarker.mock.calls[0][0] as { onViewInGroups: (id: string) => void };
+    call.onViewInGroups('g1');
+    expect(viewGroupDetailSpy).toHaveBeenCalledWith('g1');
   });
 
   it('should add each created marker to the cluster group', async () => {

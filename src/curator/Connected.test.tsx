@@ -90,6 +90,9 @@ vi.mock('./store', () => ({
       createGroup: vi.fn().mockResolvedValue(undefined),
       deleteGroup: vi.fn().mockResolvedValue(undefined),
       assignGroupId: vi.fn().mockResolvedValue(undefined),
+      selectedGroupId: null,
+      setSelectedGroupId: vi.fn(),
+      viewGroupDetail: vi.fn(),
     };
     return selector ? selector(state) : state;
   }),

@@ -59,6 +59,7 @@ beforeEach(() => {
     recordsByGroupId: new Map(),
     cache: createThumbnailCache(),
     groupedLoading: false,
+    selectedGroupId: null,
   });
 });
 
@@ -177,6 +178,23 @@ describe('GroupsView', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith('g1'));
     expect(deleteSpy).toHaveBeenCalledOnce();
+  });
+
+  it('should open the detail view when selectedGroupId is set externally via the store', async () => {
+    const group = makeGroup({ id: 'g1', name: 'Rome Trip' });
+    useAppStore.setState({ groups: [group], recordsByGroupId: new Map([['g1', []]]), selectedGroupId: 'g1' });
+    render(<GroupsView {...EXTRA_PROPS} />);
+    expect(screen.getByRole('button', { name: /back to groups/i })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /sort groups/i })).toBeNull();
+  });
+
+  it('should clear selectedGroupId in the store when the back button is clicked', async () => {
+    const user = userEvent.setup();
+    const group = makeGroup({ id: 'g1', name: 'Rome Trip' });
+    useAppStore.setState({ groups: [group], recordsByGroupId: new Map([['g1', []]]), selectedGroupId: 'g1' });
+    render(<GroupsView {...EXTRA_PROPS} />);
+    await user.click(screen.getByRole('button', { name: /back to groups/i }));
+    expect(useAppStore.getState().selectedGroupId).toBeNull();
   });
 
   it('should close the modal and return to the list after deleting from detail view', async () => {

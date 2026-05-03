@@ -33,9 +33,10 @@ export function GroupsView({
   const cache = useAppStore((s) => s.cache);
   const loading = useAppStore((s) => s.groupedLoading);
   const deleteGroup = useAppStore((s) => s.deleteGroup);
+  const selectedGroupId = useAppStore((s) => s.selectedGroupId);
+  const setSelectedGroupId = useAppStore((s) => s.setSelectedGroupId);
 
   const [sort, setSort] = useState<GroupSort>('newest');
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
 
   async function handleConfirmDelete(id: string) {

@@ -339,3 +339,36 @@ describe('useAppStore — cache', () => {
     expect(cache.peek('/photos/a.jpg')).toEqual({ tag: 'success', dataUrl: 'data:image/jpeg;base64,ok' });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Cross-tab navigation
+// ---------------------------------------------------------------------------
+
+describe('useAppStore — cross-tab navigation', () => {
+  it('should initialise selectedGroupId to null', () => {
+    expect(useAppStore.getState().selectedGroupId).toBeNull();
+  });
+
+  it('should update selectedGroupId via setSelectedGroupId', () => {
+    useAppStore.getState().setSelectedGroupId('g1');
+    expect(useAppStore.getState().selectedGroupId).toBe('g1');
+  });
+
+  it('should clear selectedGroupId when setSelectedGroupId is called with null', () => {
+    useAppStore.getState().setSelectedGroupId('g1');
+    useAppStore.getState().setSelectedGroupId(null);
+    expect(useAppStore.getState().selectedGroupId).toBeNull();
+  });
+
+  it('should set selectedGroupId via viewGroupDetail', () => {
+    useAppStore.getState().viewGroupDetail('g2');
+    expect(useAppStore.getState().selectedGroupId).toBe('g2');
+  });
+
+  it('should reset selectedGroupId to null after _resetStoreForTesting', () => {
+    useAppStore.getState().viewGroupDetail('g99');
+    expect(useAppStore.getState().selectedGroupId).toBe('g99');
+    _resetStoreForTesting();
+    expect(useAppStore.getState().selectedGroupId).toBeNull();
+  });
+});
