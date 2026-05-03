@@ -231,6 +231,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     await get().assignGroupId(photos, group.id);
     await get().loadGroups();
     await get().loadGrouped();
+    get().viewGroupDetail(group.id);
   },
 
   async deleteGroup(id) {

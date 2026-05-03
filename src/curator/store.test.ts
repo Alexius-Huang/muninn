@@ -115,6 +115,27 @@ describe('useAppStore — groups', () => {
     expect(useAppStore.getState().recordsByGroupId.has('g1')).toBe(true);
   });
 
+  it('calls viewGroupDetail with the new group id after createGroup succeeds', async () => {
+    const newGroup = { id: 'g42', name: 'Lyon', lat: 45, lng: 4, photoIds: ['k1'] };
+    mockCreateGroupAndPersist.mockResolvedValue(newGroup);
+    mockReadGroups.mockResolvedValue([newGroup]);
+    mockListCuration.mockResolvedValue([
+      makeGroupedFile('/Photos/Lyon', [{ key: 'k1', name: 'a.jpg', groupId: 'g42' }]),
+    ]);
+
+    const loc = { lat: 45, lng: 4, placeId: 'p1', displayName: 'Lyon, France', name: 'Lyon, France' };
+    await act(async () => {
+      await useAppStore.getState().createGroup({
+        name: 'Lyon',
+        location: loc,
+        photos: [{ folderPath: '/Photos/Lyon', key: 'k1' }],
+      });
+    });
+
+    expect(useAppStore.getState().selectedGroupId).toBe('g42');
+    expect(useAppStore.getState().groupNavSeq).toBe(1);
+  });
+
   it('removes a group via deleteGroup and clears its bucket from recordsByGroupId', async () => {
     useAppStore.setState({
       groups: [{ id: 'g1', name: 'Paris', lat: 48, lng: 2, photoIds: [] }],

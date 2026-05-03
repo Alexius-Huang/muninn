@@ -50,7 +50,6 @@ export function Connected({ account, onDisconnect }: Props) {
   const pendingTabRef = useRef<'browse' | 'flagged' | 'groups' | 'map' | null>(null);
 
   const { groups, loadGroups, loadFlagged, loadGrouped, flushFlagged, flushGrouped } = useAppStore();
-  const selectedGroupId = useAppStore((s) => s.selectedGroupId);
   const groupNavSeq = useAppStore((s) => s.groupNavSeq);
 
   useEffect(() => {

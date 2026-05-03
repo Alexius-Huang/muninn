@@ -245,7 +245,7 @@ describe('MapView', () => {
     const group = makeGroup({ id: 'g1' });
     useAppStore.setState({ groups: [group], viewGroupDetail: viewGroupDetailSpy });
     await act(async () => { render(<MapView />); });
-    const call = mockCreateGroupPinMarker.mock.calls[0][0] as { onViewInGroups: (id: string) => void };
+    const call = (mockCreateGroupPinMarker.mock.calls as unknown[][])[0][0] as { onViewInGroups: (id: string) => void };
     call.onViewInGroups('g1');
     expect(viewGroupDetailSpy).toHaveBeenCalledWith('g1');
   });
