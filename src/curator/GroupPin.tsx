@@ -43,8 +43,9 @@ export function createGroupPinMarker({ group, firstPhoto, cache, records, onView
   const popup = L.popup({
     closeButton: false,
     className: 'muninn-pin-popup',
-    maxWidth: 360,
-    offset: [182, -40] as L.PointExpression,
+    maxWidth: 400,
+    minWidth: 400,
+    offset: [280, 80] as L.PointExpression,
   }).setContent(popupContainer);
   marker.bindPopup(popup);
 
