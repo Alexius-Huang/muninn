@@ -1,3 +1,4 @@
+mod cf_keychain;
 mod curation;
 mod groups;
 mod keychain;
@@ -9,6 +10,9 @@ pub fn run() {
     .plugin(tauri_plugin_deep_link::init())
     .plugin(tauri_plugin_opener::init())
     .invoke_handler(tauri::generate_handler![
+      cf_keychain::read_cf_token,
+      cf_keychain::save_cf_token,
+      cf_keychain::delete_cf_token,
       keychain::get_dropbox_auth,
       keychain::set_dropbox_auth,
       keychain::delete_dropbox_auth,

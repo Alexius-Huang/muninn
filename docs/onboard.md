@@ -68,6 +68,51 @@ Verify: `rustc --version` (expect 1.77+), `cargo --version`.
 - **Tailwind v4 pattern:** single `@import "tailwindcss";` in `src/index.css`. No `tailwind.config.*` or PostCSS config — the `@tailwindcss/vite` plugin handles everything.
 - **Ticket work:** use the Ratatoskr MCP tools (`mcp__ratatoskr__create_ticket`, `mcp__ratatoskr__patch_ticket`, etc.) for all ticket operations. Prefer MCP over direct edits to `.meta/ratatoskr/tasks/`.
 
+## Cloudflare setup
+
+Muninn uses Cloudflare D1 (metadata) and R2 (photo bytes) for cloud storage. Credentials are stored in macOS Keychain, never on disk.
+
+### One-time provisioning (already done)
+
+`wrangler.toml` is gitignored (contains account + database IDs). Copy the template and fill in your values:
+
+```sh
+cp wrangler.example.toml wrangler.toml
+# edit wrangler.toml: replace YOUR_CLOUDFLARE_ACCOUNT_ID and YOUR_D1_DATABASE_ID
+```
+
+Then provision resources (already done for this project):
+
+```sh
+pnpm dlx wrangler login
+pnpm dlx wrangler r2 bucket create muninn-photos
+pnpm dlx wrangler d1 create muninn-db          # captures database_id → paste into wrangler.toml
+pnpm dlx wrangler d1 migrations apply muninn-db --remote
+pnpm dlx wrangler r2 bucket cors put muninn-photos --rules @r2-cors.json
+```
+
+### Required Cloudflare tokens
+
+Create these in the Cloudflare dashboard and paste them into the in-app CF setup panel:
+
+| Field | Token type | Required scopes |
+|---|---|---|
+| D1 API Token | Account API Token | D1:Edit, Account:Read |
+| R2 Access Key ID + Secret | R2 API Token | Object Read & Write on `muninn-photos` |
+
+### In-app credential entry
+
+Open the app and navigate to `?cf=debug` (append `?cf=debug` to the dev URL or deep-link `muninn://?cf=debug` in production). Fill in the six fields and click **Save credentials**. The app verifies the write by reading back from Keychain before confirming success.
+
+To verify manually after saving:
+```sh
+security find-generic-password -s com.huang.muninn -a cf_auth -w
+```
+
+### Debug ping panel
+
+From `?cf=debug`, use **Ping D1** and **Ping R2** to confirm end-to-end connectivity. Each ping inserts/uploads a test object and reads it back, showing the round-tripped result.
+
 ## Related docs
 
 - Spec / design history: `scratch/20260419_handoff-muninn-scaffold.md`

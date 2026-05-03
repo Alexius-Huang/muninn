@@ -25,3 +25,7 @@ dist-ssr
 
 # Ratatoskr task metadata
 .meta/
+
+# Wrangler — local config contains account/database IDs (use wrangler.example.toml as template)
+wrangler.toml
+.wrangler/

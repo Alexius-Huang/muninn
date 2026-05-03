@@ -1,0 +1,8 @@
+[
+  {
+    "AllowedOrigins": ["tauri://localhost", "http://localhost:5175"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "MaxAgeSeconds": 3600
+  }
+]
