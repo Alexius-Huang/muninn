@@ -114,9 +114,9 @@ export function CfDebugPanel() {
   }
 
   return (
-    <div className="h-full overflow-auto bg-nord-0 p-8">
+    <div className="h-full overflow-auto p-6">
       <div className="max-w-xl mx-auto space-y-6">
-        <h1 className="text-nord-6 text-lg font-semibold">Cloudflare Debug</h1>
+        <h2 className="text-nord-5 text-sm font-semibold uppercase tracking-wide">Cloudflare Settings</h2>
 
         {panelState === 'unconfigured' && (
           <form onSubmit={(e) => { void handleSave(e); }} className="space-y-4">

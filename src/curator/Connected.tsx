@@ -343,12 +343,15 @@ export function Connected({ account, onDisconnect }: Props) {
       {showCfPanel && (
         <div className="absolute inset-0 z-50 bg-nord-0/80 flex items-center justify-center">
           <div className="relative bg-nord-1 rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setShowCfPanel(false)}
-              className="absolute top-3 right-3 text-nord-4 hover:text-nord-6 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center justify-between px-6 pt-6 pb-0">
+              <h1 className="text-nord-6 text-lg font-semibold">Settings</h1>
+              <button
+                onClick={() => setShowCfPanel(false)}
+                className="text-nord-4 hover:text-nord-6 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <CfDebugPanel />
           </div>
         </div>
