@@ -4,13 +4,14 @@ import { validateToken, DropboxNetworkError } from './dropbox/client';
 import type { DropboxAccount } from './dropbox/client';
 import { SetupScreen } from './auth/SetupScreen';
 import { Connected } from './curator/Connected';
+import { ConfigurationPanel } from './cloud/ConfigurationPanel';
 
 type AppState =
   | { status: 'loading' }
   | { status: 'setup' }
   | { status: 'connected'; account: DropboxAccount };
 
-function App() {
+function MainApp() {
   const [state, setState] = useState<AppState>({ status: 'loading' });
 
   useEffect(() => {
@@ -69,6 +70,14 @@ function App() {
       onDisconnect={() => setState({ status: 'setup' })}
     />
   );
+}
+
+function App() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('cf') === 'debug') {
+    return <ConfigurationPanel />;
+  }
+  return <MainApp />;
 }
 
 export default App;
