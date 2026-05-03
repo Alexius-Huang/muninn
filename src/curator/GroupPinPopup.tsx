@@ -17,9 +17,9 @@ export function GroupPinPopup({ group, records, cache, onViewInGroups }: Props) 
   const thumbnails = records.slice(0, MAX_THUMBNAILS);
 
   return (
-    <div className="flex flex-col gap-2 p-3 w-72">
+    <div className="flex flex-col gap-2 p-3 w-100">
       <h3 className="text-nord-6 font-semibold text-sm truncate">{group.name}</h3>
-      <p className="text-nord-4 text-xs">{count} {count === 1 ? 'photo' : 'photos'}</p>
+      <p className="text-nord-4 text-xs m-0!">{count} {count === 1 ? 'photo' : 'photos'}</p>
       {thumbnails.length > 0 && (
         <div className="flex gap-1 h-16">
           {thumbnails.map((r) => (

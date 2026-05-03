@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import L from 'leaflet';
 import { Connected } from './Connected';
@@ -71,6 +71,8 @@ vi.mock('./curation', () => ({
   migrateToIdKeys: vi.fn(() => ({ changed: false, file: { folderPath: '', records: {} }, droppedCount: 0 })),
 }));
 
+const mockStoreState = vi.hoisted(() => ({ groupNavSeq: 0 }));
+
 vi.mock('./store', () => ({
   useAppStore: vi.fn((selector?: (state: unknown) => unknown) => {
     const state = {
@@ -92,7 +94,7 @@ vi.mock('./store', () => ({
       assignGroupId: vi.fn().mockResolvedValue(undefined),
       selectedGroupId: null,
       setSelectedGroupId: vi.fn(),
-      groupNavSeq: 0,
+      groupNavSeq: mockStoreState.groupNavSeq,
       viewGroupDetail: vi.fn(),
     };
     return selector ? selector(state) : state;
@@ -130,6 +132,7 @@ function makeFile(name: string, path: string) {
 }
 
 beforeEach(() => {
+  mockStoreState.groupNavSeq = 0;
   (L as unknown as Record<string, unknown>).markerClusterGroup = vi.fn(() => ({ addLayer: vi.fn() }));
   mockDisconnect.mockReset();
   mockDisconnect.mockResolvedValue(undefined);
@@ -394,5 +397,19 @@ describe('Connected > top tab bar', () => {
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
     await user.click(screen.getByRole('tab', { name: 'Map' }));
     expect(screen.getByText(/create groups in the flagged tab to see them on the map/i)).toBeInTheDocument();
+  });
+
+  it('should switch to the Groups tab when groupNavSeq increments to a non-zero value', async () => {
+    const { rerender } = render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    expect(screen.getByRole('tab', { name: 'Browse' })).toHaveAttribute('aria-selected', 'true');
+
+    await act(async () => {
+      mockStoreState.groupNavSeq = 1;
+      rerender(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Groups' })).toHaveAttribute('aria-selected', 'true');
+    });
   });
 });
