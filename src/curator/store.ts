@@ -199,6 +199,7 @@ type AppStore = {
   // Cross-tab navigation primitive (MUN-24, reused by MUN-43)
   selectedGroupId: string | null;
   setSelectedGroupId: (id: string | null) => void;
+  groupNavSeq: number;  // monotonically incremented by viewGroupDetail; always changes so effect re-fires
   viewGroupDetail: (groupId: string) => void;
 };
 
@@ -377,13 +378,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
   // Cross-tab navigation
   // ---------------------------------------------------------------------------
   selectedGroupId: null,
+  groupNavSeq: 0,
 
   setSelectedGroupId(id) {
     set({ selectedGroupId: id });
   },
 
   viewGroupDetail(groupId) {
-    set({ selectedGroupId: groupId });
+    set((s) => ({ selectedGroupId: groupId, groupNavSeq: s.groupNavSeq + 1 }));
   },
 }));
 
@@ -399,6 +401,7 @@ export function _resetStoreForTesting() {
     flaggedLoading: false,
     cache: createThumbnailCache(),
     selectedGroupId: null,
+    groupNavSeq: 0,
   });
 }
 

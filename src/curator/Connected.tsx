@@ -51,6 +51,7 @@ export function Connected({ account, onDisconnect }: Props) {
 
   const { groups, loadGroups, loadFlagged, loadGrouped, flushFlagged, flushGrouped } = useAppStore();
   const selectedGroupId = useAppStore((s) => s.selectedGroupId);
+  const groupNavSeq = useAppStore((s) => s.groupNavSeq);
 
   useEffect(() => {
     void loadGroups();
@@ -169,14 +170,13 @@ export function Connected({ account, onDisconnect }: Props) {
   handleTabChangeRef.current = handleTabChange;
 
   // When the map popup (or other external trigger) calls viewGroupDetail, switch to Groups tab.
-  // Use a ref so this effect only fires on selectedGroupId changes, not on every tab switch
-  // (handleTabChange is recreated on every tab change, which would otherwise re-trigger this effect
-  // and flip the user back to the Groups tab whenever they try to navigate away).
+  // Watch groupNavSeq (not selectedGroupId) so this fires even when the same group is re-selected.
+  // groupNavSeq === 0 is the initial mount state; skip it to avoid an spurious switch on load.
   useEffect(() => {
-    if (selectedGroupId !== null) {
+    if (groupNavSeq > 0) {
       void handleTabChangeRef.current('groups');
     }
-  }, [selectedGroupId]);
+  }, [groupNavSeq]);
 
   return (
     <Tabs

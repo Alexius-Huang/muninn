@@ -92,6 +92,7 @@ vi.mock('./store', () => ({
       assignGroupId: vi.fn().mockResolvedValue(undefined),
       selectedGroupId: null,
       setSelectedGroupId: vi.fn(),
+      groupNavSeq: 0,
       viewGroupDetail: vi.fn(),
     };
     return selector ? selector(state) : state;
