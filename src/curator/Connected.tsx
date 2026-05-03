@@ -14,6 +14,8 @@ import { Button } from '@/components/shadcn/button';
 import { GroupsView } from './GroupsView';
 import { MapView } from './MapView';
 import { useAppStore } from './store';
+import { Settings, X } from 'lucide-react';
+import { CfDebugPanel } from '../cloud/CfDebugPanel';
 
 type Props = {
   account: DropboxAccount;
@@ -45,6 +47,7 @@ export function Connected({ account, onDisconnect }: Props) {
   const [previewWidth, setPreviewWidth] = useState(480);
   const [isDraggingPreview, setIsDraggingPreview] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
+  const [showCfPanel, setShowCfPanel] = useState(false);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const pendingTabRef = useRef<'browse' | 'flagged' | 'groups' | 'map' | null>(null);
@@ -216,23 +219,20 @@ export function Connected({ account, onDisconnect }: Props) {
             Map
           </TabsTrigger>
         </TabsList>
-        {confirmingDisconnect ? (
-          <div className="flex items-center gap-2">
-            <span className="text-nord-4 text-sm">Disconnect?</span>
-            <Button variant="destructive" size="sm" onClick={handleDisconnect}>
-              Yes
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setConfirmingDisconnect(false)}>
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center">
-            <Button variant="secondary" size="sm" onClick={handleDisconnect}>
-              Disconnect
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {confirmingDisconnect ? (
+            <>
+              <span className="text-nord-4 text-sm">Disconnect?</span>
+              <Button variant="destructive" size="sm" onClick={handleDisconnect}>Yes</Button>
+              <Button variant="secondary" size="sm" onClick={() => setConfirmingDisconnect(false)}>Cancel</Button>
+            </>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={handleDisconnect}>Disconnect</Button>
+          )}
+          <button onClick={() => setShowCfPanel(true)} title="Cloud settings" className="p-1.5 text-nord-4 hover:text-nord-6 transition-colors rounded">
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 min-h-0 flex overflow-hidden">
@@ -339,6 +339,20 @@ export function Connected({ account, onDisconnect }: Props) {
           <MapView />
         </TabsContent>
       </main>
+
+      {showCfPanel && (
+        <div className="absolute inset-0 z-50 bg-nord-0/80 flex items-center justify-center">
+          <div className="relative bg-nord-1 rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setShowCfPanel(false)}
+              className="absolute top-3 right-3 text-nord-4 hover:text-nord-6 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <CfDebugPanel />
+          </div>
+        </div>
+      )}
     </Tabs>
   );
 }
