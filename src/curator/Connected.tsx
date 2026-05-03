@@ -51,7 +51,6 @@ export function Connected({ account, onDisconnect }: Props) {
 
   const { groups, loadGroups, loadFlagged, loadGrouped, flushFlagged, flushGrouped } = useAppStore();
   const selectedGroupId = useAppStore((s) => s.selectedGroupId);
-  const setSelectedGroupId = useAppStore((s) => s.setSelectedGroupId);
 
   useEffect(() => {
     void loadGroups();
@@ -153,6 +152,8 @@ export function Connected({ account, onDisconnect }: Props) {
     return { name: group.name, locationName: group.locationName };
   })();
 
+  const handleTabChangeRef = useRef<(target: 'browse' | 'flagged' | 'groups' | 'map') => Promise<void>>(async () => {});
+
   const handleTabChange = useCallback(async (target: 'browse' | 'flagged' | 'groups' | 'map') => {
     if (target === tab || target === pendingTabRef.current) return;
     pendingTabRef.current = target;
@@ -165,16 +166,17 @@ export function Connected({ account, onDisconnect }: Props) {
     pendingTabRef.current = null;
     setTab(target);
   }, [tab, flushBrowse, flushFlagged, flushGrouped, loadFlagged, reloadBrowse, loadGrouped]);
+  handleTabChangeRef.current = handleTabChange;
 
   // When the map popup (or other external trigger) calls viewGroupDetail, switch to Groups tab.
-  // Clear selectedGroupId immediately so this effect doesn't re-fire when the user later changes tabs
-  // (handleTabChange is recreated on every tab change, which would otherwise re-trigger this effect).
+  // Use a ref so this effect only fires on selectedGroupId changes, not on every tab switch
+  // (handleTabChange is recreated on every tab change, which would otherwise re-trigger this effect
+  // and flip the user back to the Groups tab whenever they try to navigate away).
   useEffect(() => {
     if (selectedGroupId !== null) {
-      setSelectedGroupId(null);
-      void handleTabChange('groups');
+      void handleTabChangeRef.current('groups');
     }
-  }, [selectedGroupId, handleTabChange, setSelectedGroupId]);
+  }, [selectedGroupId]);
 
   return (
     <Tabs
