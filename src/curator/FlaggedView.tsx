@@ -33,6 +33,7 @@ export function FlaggedView({ isActive, previewWidth, isResizing = false, onPrev
   const setFlaggedFlag = useAppStore((s) => s.setFlaggedFlag);
   const clearAllFlagged = useAppStore((s) => s.clearAllFlagged);
   const createGroup = useAppStore((s) => s.createGroup);
+  const cfAuth = useAppStore((s) => s.cfAuth);
 
   const [filter, setFilter] = useState<Filter>('all');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -105,7 +106,12 @@ export function FlaggedView({ isActive, previewWidth, isResizing = false, onPrev
           </Button>
         ))}
         {filter === 'keep' && filtered.length > 0 && (
-          <Button size="sm" onClick={() => setCreateGroupOpen(true)}>
+          <Button
+            size="sm"
+            onClick={() => setCreateGroupOpen(true)}
+            disabled={cfAuth === null}
+            title={cfAuth === null ? 'Configure Cloudflare in Settings to create groups.' : undefined}
+          >
             Create Group
           </Button>
         )}

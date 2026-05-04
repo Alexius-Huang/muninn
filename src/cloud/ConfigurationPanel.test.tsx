@@ -28,6 +28,12 @@ vi.mock('./r2Client', () => ({
   createR2Client: () => ({ putObject: mockPutObject, getObject: mockGetObject }),
 }));
 
+vi.mock('../curator/store', () => ({
+  useAppStore: {
+    getState: vi.fn(() => ({ loadCfAuth: vi.fn().mockResolvedValue(undefined) })),
+  },
+}));
+
 import type { CfAuth } from './cfAuth';
 
 const STORED_AUTH: CfAuth = {
@@ -71,6 +77,8 @@ describe('ConfigurationPanel', () => {
     await user.type(screen.getByLabelText('Account ID'), 'acct-1');
     await user.clear(screen.getByLabelText('D1 API Token'));
     await user.type(screen.getByLabelText('D1 API Token'), 'tok');
+    await user.clear(screen.getByLabelText('D1 Database ID'));
+    await user.type(screen.getByLabelText('D1 Database ID'), 'db-1');
     await user.clear(screen.getByLabelText('R2 Access Key ID'));
     await user.type(screen.getByLabelText('R2 Access Key ID'), 'key');
     await user.clear(screen.getByLabelText('R2 Secret Access Key'));

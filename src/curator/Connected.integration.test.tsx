@@ -47,6 +47,10 @@ vi.mock('./groups', async (importOriginal) => {
   };
 });
 
+vi.mock('../cloud/cfAuth', () => ({
+  getCfAuth: vi.fn().mockResolvedValue(null),
+}));
+
 beforeAll(() => {
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
     configurable: true,

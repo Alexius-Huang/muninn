@@ -26,6 +26,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
   const [submitting, setSubmitting] = useState(false);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'pending' | 'loading' | 'error'>('idle');
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleLocationStatusChange = useCallback(
     (s: 'idle' | 'pending' | 'loading' | 'error', errMsg?: string) => {
@@ -50,8 +51,9 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
       setSelectedLocation(null);
       setLocationStatus('idle');
       setLocationError(null);
-    } catch {
-      // keep modal open for retry
+      setSubmitError(null);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : String(err));
     } finally {
       setSubmitting(false);
     }
@@ -78,7 +80,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
               id="group-name"
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); setSubmitError(null); }}
               placeholder="e.g. Eiffel Tower"
               className="w-full rounded border border-nord-3 bg-nord-0 px-3 py-2 text-sm text-nord-6 placeholder-nord-3 focus:outline-none focus:ring-1 focus:ring-nord-8"
             />
@@ -107,7 +109,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => { setSelectedLocation(null); setLocationStatus('idle'); setLocationError(null); }}
+                  onClick={() => { setSelectedLocation(null); setLocationStatus('idle'); setLocationError(null); setSubmitError(null); }}
                   className="ml-2 shrink-0 text-xs text-nord-8 hover:text-nord-6"
                 >
                   Change
@@ -115,7 +117,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
               </div>
             ) : (
               <NominatimSearch
-                onSelect={setSelectedLocation}
+                onSelect={(loc) => { setSelectedLocation(loc); setSubmitError(null); }}
                 email={email}
                 placeholder="Search for a place…"
                 onStatusChange={handleLocationStatusChange}
@@ -129,6 +131,10 @@ export function CreateGroupModal({ open, onOpenChange, email, photoCount, onSubm
             lng={selectedLocation?.lng ?? null}
           />
         </div>
+
+        {submitError && (
+          <p role="alert" className="text-red-400 text-sm">{submitError}</p>
+        )}
 
         <DialogFooter>
           <Button
