@@ -256,6 +256,37 @@ export async function getPreview(pathDisplay: string): Promise<string> {
   return blobToDataUrl(blob);
 }
 
+export async function downloadFile(pathDisplay: string): Promise<Blob> {
+  const arg = asciiEscapeJson(JSON.stringify({ path: pathDisplay }));
+  const send = (): Promise<Response> =>
+    authFetch('https://content.dropboxapi.com/2/files/download', {
+      method: 'POST',
+      headers: { 'Dropbox-API-Arg': arg },
+    });
+
+  return withThumbnailSlot(async () => {
+    let resp: Response;
+    try {
+      resp = await send();
+    } catch (e) {
+      if (e instanceof DropboxRefreshError) throw e;
+      throw new DropboxNetworkError((e as Error).message);
+    }
+    if (resp.status === 429) {
+      const retryAfterSec = Number(resp.headers.get('Retry-After')) || 1;
+      await sleep(Math.min(Math.max(retryAfterSec, 1), 5) * 1000);
+      try {
+        resp = await send();
+      } catch (e) {
+        if (e instanceof DropboxRefreshError) throw e;
+        throw new DropboxNetworkError((e as Error).message);
+      }
+    }
+    if (!resp.ok) throw await parseError(resp);
+    return resp.blob();
+  });
+}
+
 export async function listFolderAll(path: string): Promise<DropboxEntry[]> {
   const all: DropboxEntry[] = [];
   let result = await listFolder(path);

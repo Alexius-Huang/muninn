@@ -4,6 +4,7 @@ import type { CfAuth } from './cfAuth';
 export type R2Client = {
   putObject(key: string, blob: Blob): Promise<void>;
   getObject(key: string): Promise<Blob | null>;
+  deleteObject(key: string): Promise<void>;
 };
 
 export function createR2Client(auth: CfAuth): R2Client {
@@ -35,6 +36,12 @@ export function createR2Client(auth: CfAuth): R2Client {
         throw new Error(`R2 GET ${res.status}: ${await res.text()}`);
       }
       return await res.blob();
+    },
+
+    async deleteObject(key) {
+      const res = await client.fetch(`${base}/${key}`, { method: 'DELETE' });
+      if (res.status === 200 || res.status === 204 || res.status === 404) return;
+      throw new Error(`R2 DELETE ${res.status}: ${await res.text()}`);
     },
   };
 }
