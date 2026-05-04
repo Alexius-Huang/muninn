@@ -17,6 +17,8 @@ export type OrchestratorDeps = {
   rollbackLocal: () => Promise<void>;
 };
 
+export const R2_UPLOAD_CONCURRENCY = 3;
+
 function r2KeyFor(photoId: string): string {
   return `photos/${photoId}`;
 }
@@ -61,12 +63,12 @@ export async function runCreateGroupTransaction(
   photos: PhotoRowWithSource[],
   deps: OrchestratorDeps,
 ): Promise<void> {
-  // Phase 1 — R2 uploads (capped at 3 concurrent to avoid WebView connection pool exhaustion)
+  // Phase 1 — R2 uploads (capped to avoid WebView connection pool exhaustion)
   const uploadResults = await settledWithConcurrency(
     photos.map((p) => () =>
       deps.uploadPhotoToR2(deps.r2, { photoId: p.id, pathDisplay: p.dropboxPath }),
     ),
-    3,
+    R2_UPLOAD_CONCURRENCY,
   );
   const fulfilledIds: string[] = [];
   const rejectedReasons: unknown[] = [];
