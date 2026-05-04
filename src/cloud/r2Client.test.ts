@@ -101,3 +101,52 @@ describe('r2Client.getObject', () => {
     expect(result).toBeNull();
   });
 });
+
+describe('r2Client.deleteObject', () => {
+  it('should DELETE the correct R2 URL', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, text: () => Promise.resolve('') });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createR2Client(AUTH);
+    await client.deleteObject('test/key.bin');
+
+    expect(capturedRequest(fetchMock).url).toBe(`${BASE_URL}/test/key.bin`);
+    expect(capturedRequest(fetchMock).method).toBe('DELETE');
+  });
+
+  it('should add AWS SigV4 Authorization and x-amz-date headers', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, text: () => Promise.resolve('') });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createR2Client(AUTH);
+    await client.deleteObject('key.bin');
+
+    const headers = capturedRequest(fetchMock).headers;
+    expect(headers.get('authorization')).toMatch(/^AWS4-HMAC-SHA256 /);
+    expect(headers.get('x-amz-date')).toMatch(/^\d{8}T\d{6}Z$/);
+  });
+
+  it.each([[200], [204], [404]])('should resolve without throwing on status %i', async (status) => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: status < 400,
+      status,
+      text: () => Promise.resolve(''),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createR2Client(AUTH);
+    await expect(client.deleteObject('key.bin')).resolves.toBeUndefined();
+  });
+
+  it('should throw on non-success non-404 status', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: () => Promise.resolve('AccessDenied'),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createR2Client(AUTH);
+    await expect(client.deleteObject('key.bin')).rejects.toThrow('R2 DELETE 403');
+  });
+});
