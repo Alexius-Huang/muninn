@@ -112,37 +112,30 @@ describe('insertGroupAndPhotos', () => {
   });
 
   it('should fan photo inserts in parallel after the group insert resolves', async () => {
-    const deferreds: Array<{ resolve: () => void }> = [];
+    const resolvers: Array<() => void> = [];
     const query = vi.fn(
-      () => new Promise<unknown[]>((resolve) => deferreds.push({ resolve: () => resolve([]) })),
+      () => new Promise<unknown[]>((res) => resolvers.push(() => res([]))),
     );
     const d1 = makeD1(query);
-    const group = makeGroup();
-    const photos = [
+    const pending = insertGroupAndPhotos(d1, makeGroup(), [
       makePhoto({ id: 'p1' }),
       makePhoto({ id: 'p2' }),
       makePhoto({ id: 'p3' }),
-    ];
+    ]);
 
-    const pending = insertGroupAndPhotos(d1, group, photos);
-
-    // flush microtasks — group INSERT should be the only call so far
-    await Promise.resolve();
-    await Promise.resolve();
+    // d1.query is called synchronously before the first await inside insertGroupAndPhotos
     expect(query).toHaveBeenCalledTimes(1);
 
-    // resolve group INSERT
-    deferreds[0].resolve();
-    await Promise.resolve();
+    // resolve the group INSERT; one microtask tick lets the continuation reach Promise.all
+    resolvers[0]();
     await Promise.resolve();
 
-    // all 3 photo INSERTs should be in flight now
+    // Promise.all maps synchronously, so all 3 photo INSERTs launch before any resolves
     expect(query).toHaveBeenCalledTimes(4);
 
-    // resolve remaining so the promise settles
-    deferreds[1].resolve();
-    deferreds[2].resolve();
-    deferreds[3].resolve();
+    resolvers[1]();
+    resolvers[2]();
+    resolvers[3]();
     await pending;
   });
 
