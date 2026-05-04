@@ -2,7 +2,7 @@ import { AwsClient } from 'aws4fetch';
 import type { CfAuth } from './cfAuth';
 
 export type R2Client = {
-  putObject(key: string, blob: Blob): Promise<void>;
+  putObject(key: string, blob: Blob, contentType?: string): Promise<void>;
   getObject(key: string): Promise<Blob | null>;
   deleteObject(key: string): Promise<void>;
 };
@@ -18,11 +18,11 @@ export function createR2Client(auth: CfAuth): R2Client {
   const base = `https://${auth.accountId}.r2.cloudflarestorage.com/${auth.r2Bucket}`;
 
   return {
-    async putObject(key, blob) {
+    async putObject(key, blob, contentType) {
       const res = await client.fetch(`${base}/${key}`, {
         method: 'PUT',
         body: blob,
-        headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+        headers: { 'Content-Type': contentType ?? (blob.type || 'application/octet-stream') },
       });
       if (!res.ok) {
         throw new Error(`R2 PUT ${res.status}: ${await res.text()}`);

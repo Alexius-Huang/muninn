@@ -46,14 +46,33 @@ describe('uploadPhotoToR2', () => {
     expect(order).toEqual(['download', 'put']);
   });
 
-  it('should pass the downloaded blob to putObject', async () => {
+  it('should pass the downloaded blob and derived content type to putObject', async () => {
     const r2 = makeR2();
     const blob = new Blob(['photo-bytes']);
     const download = vi.fn().mockResolvedValue(blob);
 
     await uploadPhotoToR2(r2, { photoId: 'p1', pathDisplay: '/img.jpg' }, download);
 
-    expect(r2.putObject).toHaveBeenCalledWith('photos/p1', blob);
+    expect(r2.putObject).toHaveBeenCalledWith('photos/p1', blob, 'image/jpeg');
+  });
+
+  it.each([
+    ['/photo.jpg', 'image/jpeg'],
+    ['/photo.jpeg', 'image/jpeg'],
+    ['/photo.png', 'image/png'],
+    ['/photo.heic', 'image/heic'],
+    ['/photo.heif', 'image/heic'],
+    ['/photo.gif', 'image/gif'],
+    ['/photo.webp', 'image/webp'],
+    ['/photo.unknown', 'application/octet-stream'],
+  ])('should derive content type from extension: %s → %s', async (pathDisplay, expectedType) => {
+    const r2 = makeR2();
+    const blob = new Blob(['x']);
+    const download = vi.fn().mockResolvedValue(blob);
+
+    await uploadPhotoToR2(r2, { photoId: 'p1', pathDisplay }, download);
+
+    expect(r2.putObject).toHaveBeenCalledWith('photos/p1', blob, expectedType);
   });
 
   it('should propagate errors from download', async () => {
