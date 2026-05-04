@@ -9,6 +9,11 @@ const mockReadGroups = vi.fn();
 const mockCreateGroupAndPersist = vi.fn();
 const mockDeleteGroupAndCascade = vi.fn();
 const mockGetThumbnailBatch = vi.fn();
+const mockGetCfAuth = vi.fn();
+const mockRunCreateGroupTransaction = vi.fn();
+const mockCreateD1Client = vi.fn(() => ({ query: vi.fn() }));
+const mockCreateR2Client = vi.fn(() => ({ putObject: vi.fn(), getObject: vi.fn(), deleteObject: vi.fn() }));
+const mockPersistGroup = vi.fn();
 
 vi.mock('./curation', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./curation')>();
@@ -26,6 +31,7 @@ vi.mock('./groups', async (importOriginal) => {
     readGroups: (...args: unknown[]) => mockReadGroups(...args),
     createGroupAndPersist: (...args: unknown[]) => mockCreateGroupAndPersist(...args),
     deleteGroupAndCascade: (...args: unknown[]) => mockDeleteGroupAndCascade(...args),
+    persistGroup: (...args: unknown[]) => mockPersistGroup(...args),
   };
 });
 
@@ -36,6 +42,22 @@ vi.mock('../dropbox/client', async (importOriginal) => {
     getThumbnailBatch: (...args: unknown[]) => mockGetThumbnailBatch(...args),
   };
 });
+
+vi.mock('../cloud/cfAuth', () => ({
+  getCfAuth: (...args: unknown[]) => mockGetCfAuth(...args),
+}));
+
+vi.mock('../cloud/createGroupOrchestrator', () => ({
+  runCreateGroupTransaction: (...args: unknown[]) => mockRunCreateGroupTransaction(...args),
+}));
+
+vi.mock('../cloud/d1Client', () => ({
+  createD1Client: (...args: unknown[]) => mockCreateD1Client(...args),
+}));
+
+vi.mock('../cloud/r2Client', () => ({
+  createR2Client: (...args: unknown[]) => mockCreateR2Client(...args),
+}));
 
 import { useAppStore, _resetStoreForTesting, createThumbnailCache } from './store';
 
@@ -70,12 +92,18 @@ beforeEach(() => {
   mockCreateGroupAndPersist.mockReset();
   mockDeleteGroupAndCascade.mockReset();
   mockGetThumbnailBatch.mockReset();
+  mockGetCfAuth.mockReset();
+  mockRunCreateGroupTransaction.mockReset();
+  mockPersistGroup.mockReset();
   mockListCuration.mockResolvedValue([]);
   mockWriteCuration.mockResolvedValue(undefined);
   mockReadGroups.mockResolvedValue([]);
   mockCreateGroupAndPersist.mockResolvedValue({ id: 'g1', name: 'Test', lat: 0, lng: 0, photoIds: [] });
   mockDeleteGroupAndCascade.mockResolvedValue(undefined);
   mockGetThumbnailBatch.mockResolvedValue([]);
+  mockGetCfAuth.mockResolvedValue(null);
+  mockRunCreateGroupTransaction.mockResolvedValue(undefined);
+  mockPersistGroup.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -94,46 +122,130 @@ describe('useAppStore — groups', () => {
     expect(useAppStore.getState().groups).toEqual([group]);
   });
 
-  it('appends a group via createGroup and reloads grouped records', async () => {
-    const newGroup = { id: 'g1', name: 'Lyon', lat: 45, lng: 4, photoIds: ['k1'] };
-    mockCreateGroupAndPersist.mockResolvedValue(newGroup);
-    mockReadGroups.mockResolvedValue([newGroup]);
-    mockListCuration.mockResolvedValue([
-      makeGroupedFile('/Photos/Lyon', [{ key: 'k1', name: 'a.jpg', groupId: 'g1' }]),
-    ]);
+  const mockCfAuth = {
+    accountId: 'acct', d1ApiToken: 'tok', d1DatabaseId: 'db',
+    r2AccessKeyId: 'key', r2SecretAccessKey: 'secret', r2Bucket: 'bucket',
+  };
 
-    const loc = { lat: 45, lng: 4, placeId: 'p1', displayName: 'Lyon, France', name: 'Lyon, France' };
-    await act(async () => {
-      await useAppStore.getState().createGroup({
-        name: 'Lyon',
-        location: loc,
-        photos: [{ folderPath: '/Photos/Lyon', key: 'k1' }],
-      });
-    });
-
-    expect(useAppStore.getState().groups).toEqual([newGroup]);
-    expect(useAppStore.getState().recordsByGroupId.has('g1')).toBe(true);
+  const makeFlatKeep = (folderPath: string, key: string, name: string, pathDisplay?: string) => ({
+    folderPath,
+    key,
+    record: { pathLower: key, pathDisplay: pathDisplay ?? `${folderPath}/${name}`, name, flag: 'keep' as const },
   });
 
-  it('calls viewGroupDetail with the new group id after createGroup succeeds', async () => {
-    const newGroup = { id: 'g42', name: 'Lyon', lat: 45, lng: 4, photoIds: ['k1'] };
-    mockCreateGroupAndPersist.mockResolvedValue(newGroup);
-    mockReadGroups.mockResolvedValue([newGroup]);
-    mockListCuration.mockResolvedValue([
-      makeGroupedFile('/Photos/Lyon', [{ key: 'k1', name: 'a.jpg', groupId: 'g42' }]),
-    ]);
+  it('should throw "Cloudflare credentials not configured" when cfAuth is null', async () => {
+    const loc = { lat: 45, lng: 4, placeId: 'p1', displayName: 'Lyon, France', name: 'Lyon, France' };
+    await expect(
+      act(async () => {
+        await useAppStore.getState().createGroup({
+          name: 'Lyon', location: loc, photos: [{ folderPath: '/Photos/Lyon', key: 'k1' }],
+        });
+      }),
+    ).rejects.toThrow('Cloudflare credentials not configured');
+    expect(mockRunCreateGroupTransaction).not.toHaveBeenCalled();
+  });
 
+  it('should call runCreateGroupTransaction with a fresh-UUID group when cfAuth is present', async () => {
+    useAppStore.setState({
+      cfAuth: mockCfAuth,
+      flaggedRecords: [makeFlatKeep('/Photos/Lyon', 'k1', 'a.jpg')],
+    });
     const loc = { lat: 45, lng: 4, placeId: 'p1', displayName: 'Lyon, France', name: 'Lyon, France' };
     await act(async () => {
       await useAppStore.getState().createGroup({
-        name: 'Lyon',
-        location: loc,
-        photos: [{ folderPath: '/Photos/Lyon', key: 'k1' }],
+        name: 'Lyon', location: loc, photos: [{ folderPath: '/Photos/Lyon', key: 'k1' }],
       });
     });
+    expect(mockRunCreateGroupTransaction).toHaveBeenCalledOnce();
+    const [group] = mockRunCreateGroupTransaction.mock.calls[0] as [{ id: string; name: string }];
+    expect(group.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    expect(group.name).toBe('Lyon');
+  });
 
-    expect(useAppStore.getState().selectedGroupId).toBe('g42');
-    expect(useAppStore.getState().groupNavSeq).toBe(1);
+  it('should generate distinct UUIDs per photo (not reuse input keys)', async () => {
+    useAppStore.setState({
+      cfAuth: mockCfAuth,
+      flaggedRecords: [
+        makeFlatKeep('/Photos/Lyon', 'k1', 'a.jpg'),
+        makeFlatKeep('/Photos/Lyon', 'k2', 'b.jpg'),
+        makeFlatKeep('/Photos/Lyon', 'k3', 'c.jpg'),
+      ],
+    });
+    const loc = { lat: 45, lng: 4, placeId: 'p1', displayName: 'Lyon, France', name: 'Lyon, France' };
+    await act(async () => {
+      await useAppStore.getState().createGroup({
+        name: 'Lyon', location: loc,
+        photos: [
+          { folderPath: '/Photos/Lyon', key: 'k1' },
+          { folderPath: '/Photos/Lyon', key: 'k2' },
+          { folderPath: '/Photos/Lyon', key: 'k3' },
+        ],
+      });
+    });
+    const photoRows = (mockRunCreateGroupTransaction.mock.calls[0] as [unknown, { id: string }[]])[1];
+    const ids = photoRows.map((r) => r.id);
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    expect(new Set(ids).size).toBe(3);
+    for (const id of ids) {
+      expect(id).toMatch(uuidRe);
+      expect(['k1', 'k2', 'k3']).not.toContain(id);
+    }
+  });
+
+  it("should pass each photo's pathDisplay through to the orchestrator's photoRows", async () => {
+    useAppStore.setState({
+      cfAuth: mockCfAuth,
+      flaggedRecords: [
+        makeFlatKeep('/Photos/Lyon', 'k1', 'a.jpg', '/Photos/Lyon/a.jpg'),
+        makeFlatKeep('/Photos/Lyon', 'k2', 'b.jpg', '/Photos/Lyon/b.jpg'),
+      ],
+    });
+    const loc = { lat: 45, lng: 4, placeId: 'p1', displayName: 'Lyon, France', name: 'Lyon, France' };
+    await act(async () => {
+      await useAppStore.getState().createGroup({
+        name: 'Lyon', location: loc,
+        photos: [
+          { folderPath: '/Photos/Lyon', key: 'k1' },
+          { folderPath: '/Photos/Lyon', key: 'k2' },
+        ],
+      });
+    });
+    const photoRows = (mockRunCreateGroupTransaction.mock.calls[0] as [unknown, { dropboxPath: string }[]])[1];
+    expect(photoRows[0].dropboxPath).toBe('/Photos/Lyon/a.jpg');
+    expect(photoRows[1].dropboxPath).toBe('/Photos/Lyon/b.jpg');
+  });
+
+  it("should bubble the orchestrator's error message verbatim", async () => {
+    useAppStore.setState({
+      cfAuth: mockCfAuth,
+      flaggedRecords: [makeFlatKeep('/Photos/Lyon', 'k1', 'a.jpg')],
+    });
+    mockRunCreateGroupTransaction.mockRejectedValue(new Error('R2 503'));
+    const loc = { lat: 45, lng: 4, placeId: 'p1', displayName: 'Lyon, France', name: 'Lyon, France' };
+    await expect(
+      act(async () => {
+        await useAppStore.getState().createGroup({
+          name: 'Lyon', location: loc, photos: [{ folderPath: '/Photos/Lyon', key: 'k1' }],
+        });
+      }),
+    ).rejects.toThrow('R2 503');
+  });
+
+  it('should throw a descriptive error when a photo is not in the flaggedRecords snapshot', async () => {
+    useAppStore.setState({
+      cfAuth: mockCfAuth,
+      flaggedRecords: [],
+    });
+    const loc = { lat: 45, lng: 4, placeId: 'p1', displayName: 'Lyon, France', name: 'Lyon, France' };
+    await expect(
+      act(async () => {
+        await useAppStore.getState().createGroup({
+          name: 'Lyon', location: loc,
+          photos: [{ folderPath: '/Photos/Lyon', key: 'missing-key' }],
+        });
+      }),
+    ).rejects.toThrow('Photo not found in flagged records:');
+    expect(mockRunCreateGroupTransaction).not.toHaveBeenCalled();
   });
 
   it('removes a group via deleteGroup and clears its bucket from recordsByGroupId', async () => {
@@ -149,6 +261,36 @@ describe('useAppStore — groups', () => {
     expect(mockDeleteGroupAndCascade).toHaveBeenCalledWith('g1');
     expect(useAppStore.getState().groups).toEqual([]);
     expect(useAppStore.getState().recordsByGroupId.has('g1')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CF auth
+// ---------------------------------------------------------------------------
+
+describe('useAppStore — cfAuth', () => {
+  const fixture = {
+    accountId: 'acct', d1ApiToken: 'tok', d1DatabaseId: 'db',
+    r2AccessKeyId: 'key', r2SecretAccessKey: 'secret', r2Bucket: 'bucket',
+  };
+
+  it('should initialise cfAuth to null', () => {
+    expect(useAppStore.getState().cfAuth).toBeNull();
+  });
+
+  it.each([
+    ['a CfAuth fixture', fixture],
+    [null, null],
+  ])('should set cfAuth to %s when getCfAuth resolves', async (_label, returnValue) => {
+    mockGetCfAuth.mockResolvedValue(returnValue);
+    await act(async () => { await useAppStore.getState().loadCfAuth(); });
+    expect(useAppStore.getState().cfAuth).toEqual(returnValue);
+  });
+
+  it('should reset cfAuth to null after _resetStoreForTesting', async () => {
+    useAppStore.setState({ cfAuth: fixture });
+    _resetStoreForTesting();
+    expect(useAppStore.getState().cfAuth).toBeNull();
   });
 });
 

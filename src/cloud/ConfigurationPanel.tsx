@@ -3,6 +3,7 @@ import { getCfAuth, setCfAuth, deleteCfAuth } from './cfAuth';
 import type { CfAuth } from './cfAuth';
 import { createD1Client } from './d1Client';
 import { createR2Client } from './r2Client';
+import { useAppStore } from '../curator/store';
 
 const DEFAULT_BUCKET = 'muninn-photos';
 
@@ -51,6 +52,7 @@ export function ConfigurationPanel() {
     try {
       await setCfAuth(form);
       await reload();
+      await useAppStore.getState().loadCfAuth();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -64,6 +66,7 @@ export function ConfigurationPanel() {
     setPanelState('unconfigured');
     setD1Result(null);
     setR2Result(null);
+    await useAppStore.getState().loadCfAuth();
   }
 
   async function handlePingD1() {

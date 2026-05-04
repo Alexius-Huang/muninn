@@ -1,9 +1,15 @@
 import { create } from 'zustand';
 import { getThumbnailBatch } from '../dropbox/client';
 import { listCuration, writeCuration, transitionToGroup, type CurationFile, type CurationRecord, type Flag } from './curation';
-import { readGroups, createGroupAndPersist, deleteGroupAndCascade } from './groups';
+import { readGroups, deleteGroupAndCascade, createGroup as makeGroup, persistGroup } from './groups';
 import type { Group } from './groups';
 import type { NominatimLocation } from '@/components/NominatimSearch';
+import { getCfAuth, type CfAuth } from '../cloud/cfAuth';
+import { createD1Client } from '../cloud/d1Client';
+import { createR2Client } from '../cloud/r2Client';
+import { runCreateGroupTransaction, type PhotoRowWithSource } from '../cloud/createGroupOrchestrator';
+import { uploadPhotoToR2 } from '../cloud/photoUpload';
+import { insertGroupAndPhotos, deleteGroupRowsFromD1 } from '../cloud/groupWrites';
 
 // ---------------------------------------------------------------------------
 // Thumbnail cache
@@ -168,6 +174,10 @@ function groupByGroupId(files: CurationFile[]): Map<string, FlatRecord[]> {
 // ---------------------------------------------------------------------------
 
 type AppStore = {
+  // CF auth
+  cfAuth: CfAuth | null;
+  loadCfAuth: () => Promise<void>;
+
   // groups
   groups: Group[];
   loadGroups: () => Promise<void>;
@@ -210,6 +220,16 @@ let flaggedTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export const useAppStore = create<AppStore>((set, get) => ({
   // ---------------------------------------------------------------------------
+  // CF auth
+  // ---------------------------------------------------------------------------
+  cfAuth: null,
+
+  async loadCfAuth() {
+    const cfAuth = await getCfAuth();
+    set({ cfAuth });
+  },
+
+  // ---------------------------------------------------------------------------
   // Groups
   // ---------------------------------------------------------------------------
   groups: [],
@@ -220,18 +240,61 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   async createGroup({ name, location, photos }) {
-    const group = await createGroupAndPersist({
+    const cfAuth = get().cfAuth;
+    if (cfAuth === null) {
+      throw new Error('Cloudflare credentials not configured. Open Settings to configure them.');
+    }
+
+    const snapshot = get().flaggedRecords;
+    const group = makeGroup({
       name,
       lat: location.lat,
       lng: location.lng,
       placeId: location.placeId,
       locationName: location.displayName,
-      photoIds: photos.map((p) => p.key),
+      photoIds: [],
     });
-    await get().assignGroupId(photos, group.id);
-    await get().loadGroups();
-    await get().loadGrouped();
-    get().viewGroupDetail(group.id);
+
+    const photoRows: PhotoRowWithSource[] = photos.map(({ folderPath, key }) => {
+      const fr = snapshot.find((r) => r.folderPath === folderPath && r.key === key);
+      if (!fr) throw new Error(`Photo not found in flagged records: ${folderPath}/${key}`);
+      const photoId = crypto.randomUUID();
+      return {
+        id: photoId,
+        groupId: group.id,
+        name: fr.record.name,
+        capturedAt: fr.record.capturedAt,
+        r2Key: `photos/${photoId}`,
+        dropboxPath: fr.record.pathDisplay,
+      };
+    });
+    group.photoIds = photoRows.map((p) => p.id);
+
+    const d1 = createD1Client(cfAuth);
+    const r2 = createR2Client(cfAuth);
+
+    await runCreateGroupTransaction(group, photoRows, {
+      d1,
+      r2,
+      uploadPhotoToR2,
+      insertGroupAndPhotos,
+      deleteGroupRowsFromD1,
+      persistLocal: async () => {
+        await persistGroup(group);
+        await get().assignGroupId(photos, group.id);
+        await get().loadGroups();
+        await get().loadGrouped();
+        get().viewGroupDetail(group.id);
+      },
+      rollbackLocal: async () => {
+        await deleteGroupAndCascade(group.id);
+        await Promise.all([
+          get().loadGroups(),
+          get().loadGrouped(),
+          get().loadFlagged(),
+        ]);
+      },
+    });
   },
 
   async deleteGroup(id) {
@@ -395,6 +458,7 @@ export function _resetStoreForTesting() {
   flaggedFiles = new Map();
   flaggedTimers = new Map();
   useAppStore.setState({
+    cfAuth: null,
     groups: [],
     recordsByGroupId: new Map(),
     groupedLoading: false,

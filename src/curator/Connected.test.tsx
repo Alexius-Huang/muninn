@@ -82,6 +82,8 @@ vi.mock('./store', () => ({
       flaggedLoading: false,
       groupedLoading: false,
       cache: LOADING_CACHE,
+      cfAuth: null,
+      loadCfAuth: vi.fn().mockResolvedValue(undefined),
       loadGroups: mockLoadGroups,
       loadFlagged: mockLoadFlagged,
       loadGrouped: mockLoadGrouped,

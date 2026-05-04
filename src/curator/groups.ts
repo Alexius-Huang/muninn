@@ -100,6 +100,11 @@ export async function writeGroups(groups: Group[]): Promise<void> {
 
 // Orchestrators — async I/O operations that compose the pure helpers above
 
+export async function persistGroup(group: Group): Promise<void> {
+  const existing = await readGroups();
+  await writeGroups([...existing, group]);
+}
+
 export async function createGroupAndPersist(args: {
   name: string;
   lat: number;
@@ -109,8 +114,7 @@ export async function createGroupAndPersist(args: {
   photoIds: string[];
 }): Promise<Group> {
   const group = createGroup(args);
-  const existing = await readGroups();
-  await writeGroups([...existing, group]);
+  await persistGroup(group);
   return group;
 }
 

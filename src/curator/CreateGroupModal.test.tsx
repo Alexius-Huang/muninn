@@ -116,6 +116,67 @@ describe('CreateGroupModal', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('should display the error message when onSubmit rejects', async () => {
+    const onSubmit = vi.fn().mockRejectedValue(new Error('R2 boom'));
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} onSubmit={onSubmit} />);
+    await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(screen.getByText('R2 boom')).toBeInTheDocument());
+  });
+
+  it('should keep the modal open when onSubmit rejects', async () => {
+    const onOpenChange = vi.fn();
+    const onSubmit = vi.fn().mockRejectedValue(new Error('R2 boom'));
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} onOpenChange={onOpenChange} onSubmit={onSubmit} />);
+    await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it('should clear the error when the user edits the name field', async () => {
+    const onSubmit = vi.fn().mockRejectedValue(new Error('R2 boom'));
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} onSubmit={onSubmit} />);
+    await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(screen.getByText('R2 boom')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Name'), 'X');
+    expect(screen.queryByText('R2 boom')).not.toBeInTheDocument();
+  });
+
+  it('should clear the error when the user picks a different location', async () => {
+    const onSubmit = vi.fn().mockRejectedValue(new Error('R2 boom'));
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} onSubmit={onSubmit} />);
+    await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(screen.getByText('R2 boom')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Change' }));
+    expect(screen.queryByText('R2 boom')).not.toBeInTheDocument();
+  });
+
+  it('should clear the error on a successful retry', async () => {
+    const onSubmit = vi.fn()
+      .mockRejectedValueOnce(new Error('R2 boom'))
+      .mockResolvedValueOnce(undefined);
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} onOpenChange={onOpenChange} onSubmit={onSubmit} />);
+    await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(screen.getByText('R2 boom')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
   it('should show placeholder initially, map preview after location is picked, and placeholder again after Change', async () => {
     const user = userEvent.setup();
     render(<CreateGroupModal {...DEFAULT_PROPS} />);

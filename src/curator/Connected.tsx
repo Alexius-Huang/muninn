@@ -52,14 +52,15 @@ export function Connected({ account, onDisconnect }: Props) {
   const previewDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const pendingTabRef = useRef<'browse' | 'flagged' | 'groups' | 'map' | null>(null);
 
-  const { groups, loadGroups, loadFlagged, loadGrouped, flushFlagged, flushGrouped } = useAppStore();
+  const { groups, loadGroups, loadFlagged, loadGrouped, loadCfAuth, flushFlagged, flushGrouped } = useAppStore();
   const groupNavSeq = useAppStore((s) => s.groupNavSeq);
 
   useEffect(() => {
     void loadGroups();
     void loadFlagged();
     void loadGrouped();
-  }, [loadGroups, loadFlagged, loadGrouped]);
+    void loadCfAuth();
+  }, [loadGroups, loadFlagged, loadGrouped, loadCfAuth]);
 
   const cache = useAppStore((s) => s.cache);
   const { flags, groupIds, setFlag, removeFromGroup, clearAll, flush: flushBrowse, reload: reloadBrowse } = useCurationState(active?.path ?? null, active ? sortFiles(active.entries) : []);

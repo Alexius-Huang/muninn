@@ -170,15 +170,47 @@ describe('FlaggedView', () => {
 
     it('should render Create Group button on the Keep filter when ≥1 keep record exists', async () => {
       const user = userEvent.setup();
-      useAppStore.setState({ flaggedRecords: [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')] });
+      useAppStore.setState({
+        flaggedRecords: [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')],
+        cfAuth: { accountId: 'a', d1ApiToken: 't', d1DatabaseId: 'd', r2AccessKeyId: 'k', r2SecretAccessKey: 's', r2Bucket: 'b' },
+      });
       render(<FlaggedView {...DEFAULT_PROPS} />);
       await user.click(screen.getByRole('button', { name: 'Keep' }));
       expect(screen.getByRole('button', { name: 'Create Group' })).toBeInTheDocument();
     });
 
+    it('should disable the Create Group button when cfAuth is null in the store', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({
+        flaggedRecords: [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')],
+        cfAuth: null,
+      });
+      render(<FlaggedView {...DEFAULT_PROPS} />);
+      await user.click(screen.getByRole('button', { name: 'Keep' }));
+      const btn = screen.getByRole('button', { name: 'Create Group' });
+      expect(btn).toBeDisabled();
+      expect(btn).toHaveAttribute('title', 'Configure Cloudflare in Settings to create groups.');
+    });
+
+    it('should enable the Create Group button when cfAuth is present', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({
+        flaggedRecords: [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')],
+        cfAuth: { accountId: 'a', d1ApiToken: 't', d1DatabaseId: 'd', r2AccessKeyId: 'k', r2SecretAccessKey: 's', r2Bucket: 'b' },
+      });
+      render(<FlaggedView {...DEFAULT_PROPS} />);
+      await user.click(screen.getByRole('button', { name: 'Keep' }));
+      const btn = screen.getByRole('button', { name: 'Create Group' });
+      expect(btn).not.toBeDisabled();
+      expect(btn).not.toHaveAttribute('title');
+    });
+
     it('should open the modal when Create Group is clicked', async () => {
       const user = userEvent.setup();
-      useAppStore.setState({ flaggedRecords: [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')] });
+      useAppStore.setState({
+        flaggedRecords: [makeFlat('/Photos/Lyon', 'keep.jpg', 'keep')],
+        cfAuth: { accountId: 'a', d1ApiToken: 't', d1DatabaseId: 'd', r2AccessKeyId: 'k', r2SecretAccessKey: 's', r2Bucket: 'b' },
+      });
       render(<FlaggedView {...DEFAULT_PROPS} />);
       await user.click(screen.getByRole('button', { name: 'Keep' }));
       await user.click(screen.getByRole('button', { name: 'Create Group' }));
@@ -193,6 +225,7 @@ describe('FlaggedView', () => {
           makeFlat('/Photos/Paris', 'keep2.jpg', 'keep'),
         ],
         createGroup: createGroupSpy,
+        cfAuth: { accountId: 'a', d1ApiToken: 't', d1DatabaseId: 'd', r2AccessKeyId: 'k', r2SecretAccessKey: 's', r2Bucket: 'b' },
       });
       const user = userEvent.setup();
       render(<FlaggedView {...DEFAULT_PROPS} />);

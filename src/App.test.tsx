@@ -36,6 +36,10 @@ vi.mock('./dropbox/client', async (importOriginal) => {
   };
 });
 
+vi.mock('./cloud/cfAuth', () => ({
+  getCfAuth: vi.fn().mockResolvedValue(null),
+}));
+
 const FAKE_ACCOUNT = {
   account_id: 'dbid:abc',
   name: { display_name: 'Alice' },

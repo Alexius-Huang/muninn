@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   runCreateGroupTransaction,
+  R2_UPLOAD_CONCURRENCY,
   type OrchestratorDeps,
   type PhotoRowWithSource,
 } from './createGroupOrchestrator';
@@ -296,6 +297,49 @@ describe('phase 3 — local persistence failure', () => {
     await expect(
       runCreateGroupTransaction(makeGroup(), [makePhoto()], deps),
     ).rejects.toThrow(/Failed to persist group locally:/);
+  });
+});
+
+describe('concurrency cap', () => {
+  it('should run at most R2_UPLOAD_CONCURRENCY uploads concurrently', async () => {
+    const N = R2_UPLOAD_CONCURRENCY + 5;
+    const photos = Array.from({ length: N }, (_, i) =>
+      makePhoto({ id: `p${i + 1}`, dropboxPath: `/p${i + 1}.jpg` }),
+    );
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const pendingResolvers: Array<() => void> = [];
+
+    const uploadPhotoToR2 = vi.fn().mockImplementation(() => {
+      inFlight++;
+      if (inFlight > maxInFlight) maxInFlight = inFlight;
+      return new Promise<{ r2Key: string }>((resolve) => {
+        pendingResolvers.push(() => {
+          inFlight--;
+          resolve({ r2Key: 'photos/px' });
+        });
+      });
+    });
+
+    const deps = makeDeps({ uploadPhotoToR2 });
+    const txPromise = runCreateGroupTransaction(makeGroup(), photos, deps);
+
+    // Workers start synchronously — exactly R2_UPLOAD_CONCURRENCY are in-flight before any await
+    expect(pendingResolvers.length).toBe(R2_UPLOAD_CONCURRENCY);
+    expect(maxInFlight).toBe(R2_UPLOAD_CONCURRENCY);
+
+    // Drain all uploads one at a time; each resolve lets a worker pick up the next task
+    while (pendingResolvers.length > 0) {
+      pendingResolvers.shift()!();
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+
+    await txPromise;
+
+    expect(uploadPhotoToR2).toHaveBeenCalledTimes(N);
+    expect(maxInFlight).toBe(R2_UPLOAD_CONCURRENCY);
   });
 });
 
