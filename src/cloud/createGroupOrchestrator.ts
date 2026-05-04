@@ -21,6 +21,26 @@ function r2KeyFor(photoId: string): string {
   return `photos/${photoId}`;
 }
 
+async function settledWithConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  concurrency: number,
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let next = 0;
+  async function worker() {
+    while (next < tasks.length) {
+      const i = next++;
+      try {
+        results[i] = { status: 'fulfilled', value: await tasks[i]() };
+      } catch (reason) {
+        results[i] = { status: 'rejected', reason };
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker));
+  return results;
+}
+
 async function deleteR2Objects(
   r2: R2Client,
   photoIds: string[],
@@ -41,11 +61,12 @@ export async function runCreateGroupTransaction(
   photos: PhotoRowWithSource[],
   deps: OrchestratorDeps,
 ): Promise<void> {
-  // Phase 1 — R2 uploads
-  const uploadResults = await Promise.allSettled(
-    photos.map((p) =>
+  // Phase 1 — R2 uploads (capped at 3 concurrent to avoid WebView connection pool exhaustion)
+  const uploadResults = await settledWithConcurrency(
+    photos.map((p) => () =>
       deps.uploadPhotoToR2(deps.r2, { photoId: p.id, pathDisplay: p.dropboxPath }),
     ),
+    3,
   );
   const fulfilledIds: string[] = [];
   const rejectedReasons: unknown[] = [];
