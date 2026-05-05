@@ -12,8 +12,37 @@ export type PhotoRow = {
 const GROUP_INSERT_SQL =
   'INSERT INTO groups (id, name, lat, lng, place_id, location_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)';
 const PHOTO_INSERT_SQL =
-  'INSERT INTO photos (id, group_id, name, captured_at, r2_key, created_at) VALUES (?, ?, ?, ?, ?, ?)';
+  'INSERT OR IGNORE INTO photos (id, group_id, name, captured_at, r2_key, created_at) VALUES (?, ?, ?, ?, ?, ?)';
 const GROUP_DELETE_SQL = 'DELETE FROM groups WHERE id = ?';
+
+export async function insertGroupRow(d1: D1Client, group: Group): Promise<void> {
+  const groupCreatedAt = group.createdAt ?? new Date().toISOString();
+  await d1.query(GROUP_INSERT_SQL, [
+    group.id,
+    group.name,
+    group.lat,
+    group.lng,
+    group.placeId ?? null,
+    group.locationName ?? null,
+    groupCreatedAt,
+  ]);
+}
+
+export async function insertPhotoRows(d1: D1Client, photos: PhotoRow[]): Promise<void> {
+  const now = new Date().toISOString();
+  await Promise.all(
+    photos.map((p) =>
+      d1.query(PHOTO_INSERT_SQL, [
+        p.id,
+        p.groupId,
+        p.name,
+        p.capturedAt ?? null,
+        p.r2Key,
+        now,
+      ]),
+    ),
+  );
+}
 
 export async function insertGroupAndPhotos(
   d1: D1Client,

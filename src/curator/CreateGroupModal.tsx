@@ -79,6 +79,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
   const [locationError, setLocationError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [progress, setProgress] = useState<Map<string, PhotoStatus>>(new Map());
+  const [submittedPhotos, setSubmittedPhotos] = useState<PhotoForProgress[]>([]);
 
   useEffect(() => {
     if (!open) {
@@ -89,6 +90,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
       setLocationError(null);
       setSubmitError(null);
       setProgress(new Map());
+      setSubmittedPhotos([]);
     }
   }, [open]);
 
@@ -110,8 +112,10 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
     setSubmitting(true);
     setSubmitError(null);
 
+    const snapshot = [...photos];
+    setSubmittedPhotos(snapshot);
     const initialProgress = new Map<string, PhotoStatus>(
-      photos.map((p) => [p.pathLower, 'pending']),
+      snapshot.map((p) => [p.pathLower, 'pending']),
     );
     setProgress(initialProgress);
 
@@ -130,6 +134,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
   }
 
   const inProgressPhase = progress.size > 0;
+  const displayPhotos = inProgressPhase ? submittedPhotos : photos;
   const canCreate = name.trim().length > 0 && selectedLocation !== null && !submitting;
 
   const doneCount = [...progress.values()].filter((s) => s === 'done').length;
@@ -141,7 +146,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
         <DialogHeader>
           <DialogTitle>Create group</DialogTitle>
           <DialogDescription>
-            {photos.length} keep {photos.length === 1 ? 'photo' : 'photos'} will be grouped together.
+            {displayPhotos.length} keep {displayPhotos.length === 1 ? 'photo' : 'photos'} will be grouped together.
           </DialogDescription>
         </DialogHeader>
 
@@ -210,12 +215,12 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
           <div className="flex flex-col gap-3">
             <p className="text-sm text-nord-4">
               {submitting
-                ? `Uploading ${doneCount + uploadingCount} of ${photos.length}…`
-                : `Uploaded ${doneCount} of ${photos.length}`}
+                ? `Uploading ${doneCount + uploadingCount} of ${displayPhotos.length}…`
+                : `Uploaded ${doneCount} of ${displayPhotos.length}`}
             </p>
             <div className="max-h-[50vh] overflow-y-auto pr-1">
               <div className="grid grid-cols-4 gap-2">
-                {photos.map((photo) => (
+                {displayPhotos.map((photo) => (
                   <PhotoProgressCell
                     key={photo.pathLower}
                     photo={photo}
