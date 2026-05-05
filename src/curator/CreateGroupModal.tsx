@@ -213,7 +213,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
                 ? `Uploading ${doneCount + uploadingCount} of ${photos.length}…`
                 : `Uploaded ${doneCount} of ${photos.length}`}
             </p>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-2 max-h-[50vh] overflow-y-auto pr-1">
               {photos.map((photo) => (
                 <PhotoProgressCell
                   key={photo.pathLower}
