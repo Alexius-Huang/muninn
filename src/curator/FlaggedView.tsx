@@ -34,6 +34,7 @@ export function FlaggedView({ isActive, previewWidth, isResizing = false, onPrev
   const setFlaggedFlag = useAppStore((s) => s.setFlaggedFlag);
   const clearAllFlagged = useAppStore((s) => s.clearAllFlagged);
   const createGroup = useAppStore((s) => s.createGroup);
+  const retryFailedPhotos = useAppStore((s) => s.retryFailedPhotos);
   const cfAuth = useAppStore((s) => s.cfAuth);
 
   const [filter, setFilter] = useState<Filter>('all');
@@ -202,8 +203,18 @@ export function FlaggedView({ isActive, previewWidth, isResizing = false, onPrev
         cache={cache}
         onSubmit={async ({ name, location, onPhotoProgress }) => {
           const photoList = filtered.map(({ folderPath, key }) => ({ folderPath, key }));
-          const { succeeded } = await createGroup({ name, location, photos: photoList, onPhotoProgress });
-          toast.success(`Group created — ${succeeded.length} ${succeeded.length === 1 ? 'photo' : 'photos'} uploaded`);
+          const result = await createGroup({ name, location, photos: photoList, onPhotoProgress });
+          if (result.failedPhotos.length === 0) {
+            toast.success(`Group created — ${result.succeeded.length} ${result.succeeded.length === 1 ? 'photo' : 'photos'} uploaded`);
+          }
+          return result;
+        }}
+        onRetry={async ({ failedPhotos, onPhotoProgress }) => {
+          const result = await retryFailedPhotos({ failedPhotos, onPhotoProgress });
+          if (result.failedPhotos.length === 0) {
+            toast.success('Group created — all photos uploaded');
+          }
+          return result;
         }}
       />
     </div>

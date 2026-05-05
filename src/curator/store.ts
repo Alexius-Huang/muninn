@@ -7,7 +7,7 @@ import type { NominatimLocation } from '@/components/NominatimSearch';
 import { getCfAuth, type CfAuth } from '../cloud/cfAuth';
 import { createD1Client } from '../cloud/d1Client';
 import { createR2Client } from '../cloud/r2Client';
-import { runCreateGroupTransaction, type PhotoRowWithSource } from '../cloud/createGroupOrchestrator';
+import { runCreateGroupTransaction, runRetryFailedPhotos, type PhotoRowWithSource } from '../cloud/createGroupOrchestrator';
 import { uploadPhotoToR2 } from '../cloud/photoUpload';
 import { insertGroupRow, insertPhotoRows } from '../cloud/groupWrites';
 
@@ -186,7 +186,11 @@ type AppStore = {
     location: NominatimLocation;
     photos: { folderPath: string; key: string }[];
     onPhotoProgress?: (pathLower: string, status: 'uploading' | 'done' | 'failed') => void;
-  }) => Promise<{ succeeded: string[]; failed: string[] }>;
+  }) => Promise<{ succeeded: string[]; failedPhotos: PhotoRowWithSource[] }>;
+  retryFailedPhotos: (args: {
+    failedPhotos: PhotoRowWithSource[];
+    onPhotoProgress?: (pathLower: string, status: 'uploading' | 'done' | 'failed') => void;
+  }) => Promise<{ succeeded: string[]; failedPhotos: PhotoRowWithSource[] }>;
   deleteGroup: (id: string) => Promise<void>;
 
   // grouped records (groupId → photos)
@@ -312,7 +316,47 @@ export const useAppStore = create<AppStore>((set, get) => ({
       await get().loadGrouped();
     }
 
-    return result;
+    const failedPhotos = photoRows.filter((p) => result.failed.includes(p.id));
+    return { succeeded: result.succeeded, failedPhotos };
+  },
+
+  async retryFailedPhotos({ failedPhotos, onPhotoProgress }) {
+    const cfAuth = get().cfAuth;
+    if (cfAuth === null) {
+      throw new Error('Cloudflare credentials not configured. Open Settings to configure them.');
+    }
+
+    const d1 = createD1Client(cfAuth);
+    const r2 = createR2Client(cfAuth);
+
+    const wrappedUpload: typeof uploadPhotoToR2 = (r2Client, input) => {
+      const pathLower = input.pathDisplay.toLowerCase();
+      onPhotoProgress?.(pathLower, 'uploading');
+      return uploadPhotoToR2(r2Client, input).then(
+        (res) => { onPhotoProgress?.(pathLower, 'done'); return res; },
+        (err: unknown) => { onPhotoProgress?.(pathLower, 'failed'); throw err; },
+      );
+    };
+
+    const result = await runRetryFailedPhotos(failedPhotos, {
+      d1,
+      r2,
+      uploadPhotoToR2: wrappedUpload,
+      insertPhotoRows,
+    });
+
+    if (result.succeeded.length > 0) {
+      const groupId = failedPhotos[0].groupId;
+      const group = get().groups.find((g) => g.id === groupId);
+      if (group) {
+        group.photoIds = [...group.photoIds, ...result.succeeded];
+        await persistGroup(group);
+        await get().loadGrouped();
+      }
+    }
+
+    const nextFailedPhotos = failedPhotos.filter((p) => result.failed.includes(p.id));
+    return { succeeded: result.succeeded, failedPhotos: nextFailedPhotos };
   },
 
   async deleteGroup(id) {

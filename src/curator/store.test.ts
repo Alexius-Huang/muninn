@@ -11,6 +11,7 @@ const mockDeleteGroupAndCascade = vi.fn();
 const mockGetThumbnailBatch = vi.fn();
 const mockGetCfAuth = vi.fn();
 const mockRunCreateGroupTransaction = vi.fn();
+const mockRunRetryFailedPhotos = vi.fn();
 const mockCreateD1Client = vi.fn(() => ({ query: vi.fn() }));
 const mockCreateR2Client = vi.fn(() => ({ putObject: vi.fn(), getObject: vi.fn(), deleteObject: vi.fn() }));
 const mockPersistGroup = vi.fn();
@@ -50,6 +51,7 @@ vi.mock('../cloud/cfAuth', () => ({
 
 vi.mock('../cloud/createGroupOrchestrator', () => ({
   runCreateGroupTransaction: (...args: unknown[]) => mockRunCreateGroupTransaction(...args),
+  runRetryFailedPhotos: (...args: unknown[]) => mockRunRetryFailedPhotos(...args),
 }));
 
 vi.mock('../cloud/d1Client', () => ({
@@ -99,6 +101,7 @@ beforeEach(() => {
   mockGetThumbnailBatch.mockReset();
   mockGetCfAuth.mockReset();
   mockRunCreateGroupTransaction.mockReset();
+  mockRunRetryFailedPhotos.mockReset();
   mockPersistGroup.mockReset();
   mockListCuration.mockResolvedValue([]);
   mockWriteCuration.mockResolvedValue(undefined);
@@ -108,6 +111,7 @@ beforeEach(() => {
   mockGetThumbnailBatch.mockResolvedValue([]);
   mockGetCfAuth.mockResolvedValue(null);
   mockRunCreateGroupTransaction.mockResolvedValue({ succeeded: [], failed: [] });
+  mockRunRetryFailedPhotos.mockResolvedValue({ succeeded: [], failed: [] });
   mockPersistGroup.mockResolvedValue(undefined);
   mockUploadPhotoToR2.mockReset();
   mockUploadPhotoToR2.mockResolvedValue({ r2Key: 'photos/test' });
@@ -318,8 +322,8 @@ describe('useAppStore — groups', () => {
     );
 
     const loc = { lat: 45, lng: 4, placeId: 'p1', displayName: 'Lyon, France', name: 'Lyon, France' };
-    await act(async () => {
-      await useAppStore.getState().createGroup({
+    const result = await act(async () => {
+      return await useAppStore.getState().createGroup({
         name: 'Lyon', location: loc,
         photos: [
           { folderPath: '/Photos/Lyon', key: 'k1' },
@@ -331,6 +335,44 @@ describe('useAppStore — groups', () => {
     expect(mockPersistGroup).toHaveBeenCalledOnce();
     const [groupOnFixup] = mockPersistGroup.mock.calls[0] as [{ photoIds: string[] }];
     expect(groupOnFixup.photoIds).toEqual(capturedSucceeded);
+    expect(result.failedPhotos).toHaveLength(1);
+    expect(result.failedPhotos[0].id).toBe((mockRunCreateGroupTransaction.mock.calls[0] as [unknown, { id: string }[]])[1][1].id);
+  });
+
+  describe('retryFailedPhotos', () => {
+    const failedPhoto = {
+      id: 'p2', groupId: 'g1', name: 'b.jpg', capturedAt: '2026-01-01T12:00:00.000Z',
+      r2Key: 'photos/p2', dropboxPath: '/Photos/Lyon/b.jpg',
+    };
+
+    it('should re-upload only the failed photos and append succeeded IDs to local group.photoIds', async () => {
+      useAppStore.setState({
+        cfAuth: mockCfAuth,
+        groups: [{ id: 'g1', name: 'Lyon Trip', lat: 45, lng: 4, placeId: 'p1', locationName: 'Lyon, France', photoIds: ['p1'], createdAt: '2026-01-01T00:00:00.000Z' }],
+      });
+      mockRunRetryFailedPhotos.mockResolvedValue({ succeeded: ['p2'], failed: [] });
+      mockListCuration.mockResolvedValue([]);
+
+      const result = await act(async () => {
+        return await useAppStore.getState().retryFailedPhotos({ failedPhotos: [failedPhoto] });
+      });
+
+      expect(mockRunRetryFailedPhotos).toHaveBeenCalledOnce();
+      expect(mockPersistGroup).toHaveBeenCalledOnce();
+      const [persistedGroup] = mockPersistGroup.mock.calls[0] as [{ photoIds: string[] }];
+      expect(persistedGroup.photoIds).toEqual(['p1', 'p2']);
+      expect(result.succeeded).toEqual(['p2']);
+      expect(result.failedPhotos).toEqual([]);
+    });
+
+    it('should throw when cfAuth is null', async () => {
+      await expect(
+        act(async () => {
+          await useAppStore.getState().retryFailedPhotos({ failedPhotos: [failedPhoto] });
+        }),
+      ).rejects.toThrow('Cloudflare credentials not configured');
+      expect(mockRunRetryFailedPhotos).not.toHaveBeenCalled();
+    });
   });
 
   it('removes a group via deleteGroup and clears its bucket from recordsByGroupId', async () => {

@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   runCreateGroupTransaction,
+  runRetryFailedPhotos,
   R2_UPLOAD_CONCURRENCY,
   D1PhotoInsertError,
   type OrchestratorDeps,
@@ -415,5 +416,101 @@ describe('rollback robustness', () => {
       runCreateGroupTransaction(makeGroup(), [makePhoto()], deps),
     ).rejects.toThrow(/Failed to write group metadata to D1: D1 group error/);
     expect(console.warn).toHaveBeenCalled();
+  });
+});
+
+function makeRetryDeps(
+  overrides: Partial<Pick<OrchestratorDeps, 'd1' | 'r2' | 'uploadPhotoToR2' | 'insertPhotoRows'>> = {},
+) {
+  return {
+    d1: makeD1(),
+    r2: makeR2(),
+    uploadPhotoToR2: vi.fn().mockResolvedValue({ r2Key: 'photos/p1' }),
+    insertPhotoRows: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
+describe('runRetryFailedPhotos', () => {
+  it('should re-upload only the photos passed in', async () => {
+    const photos = [
+      makePhoto({ id: 'p1', dropboxPath: '/a.jpg' }),
+      makePhoto({ id: 'p2', dropboxPath: '/b.jpg' }),
+    ];
+    const deps = makeRetryDeps();
+    await runRetryFailedPhotos(photos, deps);
+
+    expect(deps.uploadPhotoToR2).toHaveBeenCalledTimes(2);
+    expect(deps.uploadPhotoToR2).toHaveBeenCalledWith(deps.r2, { photoId: 'p1', pathDisplay: '/a.jpg' });
+    expect(deps.uploadPhotoToR2).toHaveBeenCalledWith(deps.r2, { photoId: 'p2', pathDisplay: '/b.jpg' });
+  });
+
+  it('should insert D1 photo rows only for succeeded retries', async () => {
+    const photos = [
+      makePhoto({ id: 'p1', dropboxPath: '/a.jpg' }),
+      makePhoto({ id: 'p2', dropboxPath: '/b.jpg' }),
+    ];
+    const uploadPhotoToR2 = vi.fn()
+      .mockResolvedValueOnce({ r2Key: 'photos/p1' })
+      .mockRejectedValueOnce(new Error('upload p2 failed'));
+    const deps = makeRetryDeps({ uploadPhotoToR2 });
+
+    await runRetryFailedPhotos(photos, deps);
+
+    expect(deps.insertPhotoRows).toHaveBeenCalledOnce();
+    const [, calledPhotos] = (deps.insertPhotoRows as ReturnType<typeof vi.fn>).mock.calls[0] as [unknown, PhotoRowWithSource[]];
+    expect(calledPhotos.map((p) => p.id)).toEqual(['p1']);
+  });
+
+  it('should not call insertGroupRow', async () => {
+    const insertGroupRow = vi.fn();
+    const deps = makeRetryDeps();
+    await runRetryFailedPhotos([makePhoto()], deps);
+
+    expect(insertGroupRow).not.toHaveBeenCalled();
+  });
+
+  it('should retry D1 batch insert up to 3 times with exponential backoff', async () => {
+    vi.useFakeTimers();
+    const insertPhotoRows = vi.fn().mockRejectedValue(new Error('D1 transient'));
+    const deps = makeRetryDeps({ insertPhotoRows });
+
+    const retryPromise = runRetryFailedPhotos([makePhoto()], deps).catch(() => {});
+    await vi.advanceTimersByTimeAsync(500 + 1000 + 2000 + 1);
+    await retryPromise;
+
+    expect(insertPhotoRows).toHaveBeenCalledTimes(4);
+    vi.useRealTimers();
+  });
+
+  it('should throw D1PhotoInsertError with succeeded R2 photo IDs when D1 insert exhausts retries', async () => {
+    vi.useFakeTimers();
+    const photos = [
+      makePhoto({ id: 'p1', dropboxPath: '/a.jpg' }),
+      makePhoto({ id: 'p2', dropboxPath: '/b.jpg' }),
+    ];
+    const uploadPhotoToR2 = vi.fn()
+      .mockResolvedValueOnce({ r2Key: 'photos/p1' })
+      .mockRejectedValueOnce(new Error('upload p2 failed'));
+    const insertPhotoRows = vi.fn().mockRejectedValue(new Error('D1 down'));
+    const deps = makeRetryDeps({ uploadPhotoToR2, insertPhotoRows });
+
+    let caughtError: unknown;
+    const retryPromise = runRetryFailedPhotos(photos, deps).catch((e) => { caughtError = e; });
+    await vi.advanceTimersByTimeAsync(500 + 1000 + 2000 + 1);
+    await retryPromise;
+
+    expect(caughtError).toBeInstanceOf(D1PhotoInsertError);
+    expect((caughtError as D1PhotoInsertError).succeededR2PhotoIds).toEqual(['p1']);
+    vi.useRealTimers();
+  });
+
+  it('should not insert D1 rows when every R2 upload fails', async () => {
+    const deps = makeRetryDeps({
+      uploadPhotoToR2: vi.fn().mockRejectedValue(new Error('R2 error')),
+    });
+
+    await runRetryFailedPhotos([makePhoto()], deps);
+    expect(deps.insertPhotoRows).not.toHaveBeenCalled();
   });
 });

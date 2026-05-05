@@ -62,7 +62,7 @@ beforeEach(() => {
     cache: createThumbnailCache(),
     setFlaggedFlag: vi.fn(),
     clearAllFlagged: vi.fn(),
-    createGroup: vi.fn().mockResolvedValue({ succeeded: [], failed: [] }),
+    createGroup: vi.fn().mockResolvedValue({ succeeded: [], failedPhotos: [] }),
   });
 });
 
@@ -218,7 +218,7 @@ describe('FlaggedView', () => {
     });
 
     it('should call store createGroup with the visible keep photos when the modal submits', async () => {
-      const createGroupSpy = vi.fn().mockResolvedValue({ succeeded: [], failed: [] });
+      const createGroupSpy = vi.fn().mockResolvedValue({ succeeded: [], failedPhotos: [] });
       useAppStore.setState({
         flaggedRecords: [
           makeFlat('/Photos/Lyon', 'keep.jpg', 'keep'),

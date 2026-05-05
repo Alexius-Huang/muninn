@@ -28,6 +28,7 @@ vi.mock('@/components/LocationMapPreview', () => ({
 }));
 
 import { CreateGroupModal } from './CreateGroupModal';
+import type { PhotoRowWithSource } from '@/cloud/createGroupOrchestrator';
 
 const LOADING_STATE = { tag: 'loading' as const };
 const mockCache: ThumbnailCache = {
@@ -42,6 +43,8 @@ const PHOTOS = [
   { pathLower: '/photos/b.jpg', pathDisplay: '/Photos/b.jpg', name: 'b.jpg' },
   { pathLower: '/photos/c.jpg', pathDisplay: '/Photos/c.jpg', name: 'c.jpg' },
 ];
+
+const NO_FAILURES = { succeeded: ['p1', 'p2', 'p3'], failedPhotos: [] as PhotoRowWithSource[] };
 
 beforeAll(() => {
   // Radix portal renders into document.body; no extra setup required in jsdom
@@ -58,7 +61,7 @@ const DEFAULT_PROPS = {
   email: 'test@example.com',
   photos: PHOTOS,
   cache: mockCache,
-  onSubmit: vi.fn().mockResolvedValue(undefined),
+  onSubmit: vi.fn().mockResolvedValue(NO_FAILURES),
 };
 
 describe('CreateGroupModal', () => {
@@ -85,7 +88,7 @@ describe('CreateGroupModal', () => {
   });
 
   it('should call onSubmit with the entered name and selected location', async () => {
-    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const onSubmit = vi.fn().mockResolvedValue(NO_FAILURES);
     const user = userEvent.setup();
     render(<CreateGroupModal {...DEFAULT_PROPS} onSubmit={onSubmit} />);
     await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
@@ -100,7 +103,7 @@ describe('CreateGroupModal', () => {
 
   it('should close (call onOpenChange(false)) after a successful submit', async () => {
     const onOpenChange = vi.fn();
-    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const onSubmit = vi.fn().mockResolvedValue(NO_FAILURES);
     const user = userEvent.setup();
     render(<CreateGroupModal {...DEFAULT_PROPS} onOpenChange={onOpenChange} onSubmit={onSubmit} />);
     await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
@@ -156,7 +159,7 @@ describe('CreateGroupModal', () => {
   it('should clear the error on a successful retry', async () => {
     const onSubmit = vi.fn()
       .mockRejectedValueOnce(new Error('R2 boom'))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce(NO_FAILURES);
     const onOpenChange = vi.fn();
     const user = userEvent.setup();
     render(<CreateGroupModal {...DEFAULT_PROPS} onOpenChange={onOpenChange} onSubmit={onSubmit} />);
@@ -164,7 +167,8 @@ describe('CreateGroupModal', () => {
     await user.click(screen.getByRole('button', { name: 'Pick location' }));
     await user.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(screen.getByText('R2 boom')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: 'Creating…' }));
+    // After a thrown error, progress is reset so the form reappears with Create enabled
+    await user.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 
@@ -189,8 +193,8 @@ describe('CreateGroupModal', () => {
   // -------------------------------------------------------------------------
 
   it('should show progress view (photo grid) after submit starts', async () => {
-    let resolveSubmit!: () => void;
-    const onSubmit = vi.fn().mockReturnValue(new Promise<void>((res) => { resolveSubmit = res; }));
+    let resolveSubmit!: (val: typeof NO_FAILURES) => void;
+    const onSubmit = vi.fn().mockReturnValue(new Promise<typeof NO_FAILURES>((res) => { resolveSubmit = res; }));
     const user = userEvent.setup();
     render(<CreateGroupModal {...DEFAULT_PROPS} onSubmit={onSubmit} />);
     await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
@@ -202,16 +206,16 @@ describe('CreateGroupModal', () => {
     cells.forEach((cell) => expect(cell).toHaveAttribute('data-status', 'pending'));
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
 
-    await act(async () => { resolveSubmit(); });
+    await act(async () => { resolveSubmit(NO_FAILURES); });
   });
 
   it('should update cell status as onPhotoProgress fires', async () => {
     let capturedProgress!: (pathLower: string, status: 'uploading' | 'done' | 'failed') => void;
-    let resolveSubmit!: () => void;
+    let resolveSubmit!: (val: typeof NO_FAILURES) => void;
     const onSubmit = vi.fn().mockImplementation(
       ({ onPhotoProgress }: { onPhotoProgress: (pathLower: string, status: 'uploading' | 'done' | 'failed') => void }) => {
         capturedProgress = onPhotoProgress;
-        return new Promise<void>((res) => { resolveSubmit = res; });
+        return new Promise<typeof NO_FAILURES>((res) => { resolveSubmit = res; });
       },
     );
     const user = userEvent.setup();
@@ -226,12 +230,12 @@ describe('CreateGroupModal', () => {
     act(() => { capturedProgress('/photos/a.jpg', 'done'); });
     expect(screen.getByLabelText('a.jpg — done')).toBeInTheDocument();
 
-    await act(async () => { resolveSubmit(); });
+    await act(async () => { resolveSubmit(NO_FAILURES); });
   });
 
   it('should auto-close and not show error when all uploads succeed', async () => {
     const onOpenChange = vi.fn();
-    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const onSubmit = vi.fn().mockResolvedValue(NO_FAILURES);
     const user = userEvent.setup();
     render(<CreateGroupModal {...DEFAULT_PROPS} onOpenChange={onOpenChange} onSubmit={onSubmit} />);
     await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
@@ -241,13 +245,11 @@ describe('CreateGroupModal', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('should keep modal open with failed cells when onSubmit rejects', async () => {
-    let capturedProgress!: (pathLower: string, status: 'uploading' | 'done' | 'failed') => void;
+  it('should keep modal open and return to form view when onSubmit rejects', async () => {
     const onOpenChange = vi.fn();
     const onSubmit = vi.fn().mockImplementation(
       ({ onPhotoProgress }: { onPhotoProgress: (pathLower: string, status: 'uploading' | 'done' | 'failed') => void }) => {
-        capturedProgress = onPhotoProgress;
-        capturedProgress('/photos/a.jpg', 'failed');
+        onPhotoProgress('/photos/a.jpg', 'failed');
         return Promise.reject(new Error('Upload failed'));
       },
     );
@@ -258,12 +260,14 @@ describe('CreateGroupModal', () => {
     await user.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
-    expect(screen.getByLabelText('a.jpg — failed')).toBeInTheDocument();
+    // progress is reset in catch so the form view returns (cells are gone, name input is back)
+    expect(screen.queryByTestId('progress-cell')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
   });
 
   it('should hide Cancel and disable Create while in progress phase', async () => {
-    let resolveSubmit!: () => void;
-    const onSubmit = vi.fn().mockReturnValue(new Promise<void>((res) => { resolveSubmit = res; }));
+    let resolveSubmit!: (val: typeof NO_FAILURES) => void;
+    const onSubmit = vi.fn().mockReturnValue(new Promise<typeof NO_FAILURES>((res) => { resolveSubmit = res; }));
     const user = userEvent.setup();
     render(<CreateGroupModal {...DEFAULT_PROPS} onSubmit={onSubmit} />);
     await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
@@ -273,12 +277,12 @@ describe('CreateGroupModal', () => {
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Creating…' })).toBeDisabled();
 
-    await act(async () => { resolveSubmit(); });
+    await act(async () => { resolveSubmit(NO_FAILURES); });
   });
 
   it('should reset progress state when modal is re-opened', async () => {
-    let resolveSubmit!: () => void;
-    const onSubmit = vi.fn().mockReturnValue(new Promise<void>((res) => { resolveSubmit = res; }));
+    let resolveSubmit!: (val: typeof NO_FAILURES) => void;
+    const onSubmit = vi.fn().mockReturnValue(new Promise<typeof NO_FAILURES>((res) => { resolveSubmit = res; }));
     const onOpenChange = vi.fn();
     const { rerender } = render(
       <CreateGroupModal {...DEFAULT_PROPS} open={true} onOpenChange={onOpenChange} onSubmit={onSubmit} />,
@@ -295,6 +299,113 @@ describe('CreateGroupModal', () => {
     expect(screen.getByLabelText('Name')).toBeInTheDocument();
     expect(screen.queryByTestId('progress-cell')).not.toBeInTheDocument();
 
-    await act(async () => { resolveSubmit(); });
+    await act(async () => { resolveSubmit(NO_FAILURES); });
+  });
+
+  // -------------------------------------------------------------------------
+  // Retry tests
+  // -------------------------------------------------------------------------
+
+  it('should show Retry button when photos fail', async () => {
+    const failedPhoto: PhotoRowWithSource = {
+      id: 'p1', groupId: 'g1', name: 'a.jpg', r2Key: 'photos/p1', dropboxPath: '/Photos/a.jpg',
+    };
+    const onSubmit = vi.fn().mockResolvedValue({ succeeded: [], failedPhotos: [failedPhoto] });
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} onSubmit={onSubmit} />);
+    await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Retry failed' })).toBeInTheDocument());
+  });
+
+  it('should retry only failed photos', async () => {
+    const failedPhoto: PhotoRowWithSource = {
+      id: 'p2', groupId: 'g1', name: 'b.jpg', r2Key: 'photos/p2', dropboxPath: '/Photos/b.jpg',
+    };
+    const onSubmit = vi.fn().mockResolvedValue({ succeeded: ['p1', 'p3'], failedPhotos: [failedPhoto] });
+    const onRetry = vi.fn().mockResolvedValue({ succeeded: [], failedPhotos: [failedPhoto] });
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} onSubmit={onSubmit} onRetry={onRetry} />);
+    await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => screen.getByRole('button', { name: 'Retry failed' }));
+    await user.click(screen.getByRole('button', { name: 'Retry failed' }));
+    await waitFor(() => expect(onRetry).toHaveBeenCalledOnce());
+    expect(onRetry).toHaveBeenCalledWith(expect.objectContaining({ failedPhotos: [failedPhoto] }));
+  });
+
+  it('should insert D1 row for each retry that succeeds', async () => {
+    const failedPhoto: PhotoRowWithSource = {
+      id: 'p1', groupId: 'g1', name: 'a.jpg', r2Key: 'photos/p1', dropboxPath: '/photos/a.jpg',
+    };
+    const onSubmit = vi.fn().mockResolvedValue({ succeeded: [], failedPhotos: [failedPhoto] });
+    const onRetry = vi.fn().mockImplementation(
+      ({ onPhotoProgress }: { onPhotoProgress: (p: string, s: 'uploading' | 'done' | 'failed') => void; failedPhotos: PhotoRowWithSource[] }) => {
+        onPhotoProgress('/photos/a.jpg', 'done');
+        return Promise.resolve({ succeeded: [failedPhoto.id], failedPhotos: [] });
+      },
+    );
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} onSubmit={onSubmit} onRetry={onRetry} />);
+    await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => screen.getByRole('button', { name: 'Retry failed' }));
+    await user.click(screen.getByRole('button', { name: 'Retry failed' }));
+    await waitFor(() => expect(onRetry).toHaveBeenCalledOnce());
+    expect(screen.getByLabelText('a.jpg — done')).toBeInTheDocument();
+  });
+
+  it('should close modal and show toast when retry completes all photos', async () => {
+    const failedPhoto: PhotoRowWithSource = {
+      id: 'p1', groupId: 'g1', name: 'a.jpg', r2Key: 'photos/p1', dropboxPath: '/Photos/a.jpg',
+    };
+    const onSubmit = vi.fn().mockResolvedValue({ succeeded: [], failedPhotos: [failedPhoto] });
+    const onRetry = vi.fn().mockResolvedValue({ succeeded: [failedPhoto.id], failedPhotos: [] });
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} onSubmit={onSubmit} onRetry={onRetry} onOpenChange={onOpenChange} />);
+    await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => screen.getByRole('button', { name: 'Retry failed' }));
+    await user.click(screen.getByRole('button', { name: 'Retry failed' }));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
+  it('should keep remaining failures visible when retry partially succeeds', async () => {
+    const photo1: PhotoRowWithSource = {
+      id: 'p1', groupId: 'g1', name: 'a.jpg', r2Key: 'photos/p1', dropboxPath: '/Photos/a.jpg',
+    };
+    const photo2: PhotoRowWithSource = {
+      id: 'p2', groupId: 'g1', name: 'b.jpg', r2Key: 'photos/p2', dropboxPath: '/Photos/b.jpg',
+    };
+    const onSubmit = vi.fn().mockImplementation(
+      ({ onPhotoProgress }: { onPhotoProgress: (p: string, s: 'uploading' | 'done' | 'failed') => void }) => {
+        onPhotoProgress('/photos/a.jpg', 'failed');
+        onPhotoProgress('/photos/b.jpg', 'failed');
+        return Promise.resolve({ succeeded: [], failedPhotos: [photo1, photo2] });
+      },
+    );
+    const onRetry = vi.fn().mockImplementation(
+      ({ onPhotoProgress }: { onPhotoProgress: (p: string, s: 'uploading' | 'done' | 'failed') => void }) => {
+        onPhotoProgress('/photos/a.jpg', 'done');
+        return Promise.resolve({ succeeded: [photo1.id], failedPhotos: [photo2] });
+      },
+    );
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(<CreateGroupModal {...DEFAULT_PROPS} onSubmit={onSubmit} onRetry={onRetry} onOpenChange={onOpenChange} />);
+    await user.type(screen.getByLabelText('Name'), 'Eiffel Tower');
+    await user.click(screen.getByRole('button', { name: 'Pick location' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => screen.getByRole('button', { name: 'Retry failed' }));
+    await user.click(screen.getByRole('button', { name: 'Retry failed' }));
+    await waitFor(() => expect(screen.getByLabelText('a.jpg — done')).toBeInTheDocument());
+    expect(screen.getByLabelText('b.jpg — failed')).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(screen.getByRole('button', { name: 'Retry failed' })).toBeInTheDocument();
   });
 });
