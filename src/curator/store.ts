@@ -185,6 +185,7 @@ type AppStore = {
     name: string;
     location: NominatimLocation;
     photos: { folderPath: string; key: string }[];
+    onPhotoProgress?: (pathLower: string, status: 'uploading' | 'done' | 'failed') => void;
   }) => Promise<void>;
   deleteGroup: (id: string) => Promise<void>;
 
@@ -239,7 +240,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ groups });
   },
 
-  async createGroup({ name, location, photos }) {
+  async createGroup({ name, location, photos, onPhotoProgress }) {
     const cfAuth = get().cfAuth;
     if (cfAuth === null) {
       throw new Error('Cloudflare credentials not configured. Open Settings to configure them.');
@@ -273,10 +274,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const d1 = createD1Client(cfAuth);
     const r2 = createR2Client(cfAuth);
 
+    const wrappedUpload: typeof uploadPhotoToR2 = (r2Client, input) => {
+      const pathLower = input.pathDisplay.toLowerCase();
+      onPhotoProgress?.(pathLower, 'uploading');
+      return uploadPhotoToR2(r2Client, input).then(
+        (res) => { onPhotoProgress?.(pathLower, 'done'); return res; },
+        (err: unknown) => { onPhotoProgress?.(pathLower, 'failed'); throw err; },
+      );
+    };
+
     await runCreateGroupTransaction(group, photoRows, {
       d1,
       r2,
-      uploadPhotoToR2,
+      uploadPhotoToR2: wrappedUpload,
       insertGroupAndPhotos,
       deleteGroupRowsFromD1,
       persistLocal: async () => {
