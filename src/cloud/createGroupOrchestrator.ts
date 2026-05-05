@@ -132,3 +132,40 @@ export async function runCreateGroupTransaction(
 
   return { succeeded: succeededIds, failed: failedIds };
 }
+
+export async function runRetryFailedPhotos(
+  failedPhotos: PhotoRowWithSource[],
+  deps: Pick<OrchestratorDeps, 'd1' | 'r2' | 'uploadPhotoToR2' | 'insertPhotoRows'>,
+): Promise<CreateGroupResult> {
+  const uploadResults = await settledWithConcurrency(
+    failedPhotos.map((p) => () =>
+      deps.uploadPhotoToR2(deps.r2, { photoId: p.id, pathDisplay: p.dropboxPath }),
+    ),
+    R2_UPLOAD_CONCURRENCY,
+  );
+
+  const succeededPhotos: PhotoRowWithSource[] = [];
+  const failedIds: string[] = [];
+  uploadResults.forEach((r, i) => {
+    if (r.status === 'fulfilled') succeededPhotos.push(failedPhotos[i]);
+    else failedIds.push(failedPhotos[i].id);
+  });
+
+  const succeededIds = succeededPhotos.map((p) => p.id);
+  if (succeededPhotos.length > 0) {
+    try {
+      await withExponentialRetry(
+        () => deps.insertPhotoRows(deps.d1, succeededPhotos),
+        RETRY_DELAYS_MS,
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new D1PhotoInsertError(
+        `Failed to insert photo rows to D1: ${reason}`,
+        succeededIds,
+      );
+    }
+  }
+
+  return { succeeded: succeededIds, failed: failedIds };
+}

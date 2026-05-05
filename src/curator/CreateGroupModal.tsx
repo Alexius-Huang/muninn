@@ -12,6 +12,7 @@ import type { NominatimLocation } from '@/components/NominatimSearch';
 import { LocationMapPreview } from '@/components/LocationMapPreview';
 import { Button } from '@/components/shadcn/button';
 import type { ThumbnailCache } from './store';
+import type { PhotoRowWithSource } from '@/cloud/createGroupOrchestrator';
 
 export type PhotoForProgress = { pathLower: string; pathDisplay: string; name: string };
 type PhotoStatus = 'pending' | 'uploading' | 'done' | 'failed';
@@ -26,7 +27,11 @@ type Props = {
     name: string;
     location: NominatimLocation;
     onPhotoProgress: (pathLower: string, status: 'uploading' | 'done' | 'failed') => void;
-  }) => Promise<void>;
+  }) => Promise<{ succeeded: string[]; failedPhotos: PhotoRowWithSource[] }>;
+  onRetry?: (args: {
+    failedPhotos: PhotoRowWithSource[];
+    onPhotoProgress: (pathLower: string, status: 'uploading' | 'done' | 'failed') => void;
+  }) => Promise<{ succeeded: string[]; failedPhotos: PhotoRowWithSource[] }>;
 };
 
 function PhotoProgressCell({ photo, status, cache }: { photo: PhotoForProgress; status: PhotoStatus; cache: ThumbnailCache }) {
@@ -71,15 +76,17 @@ function PhotoProgressCell({ photo, status, cache }: { photo: PhotoForProgress; 
   );
 }
 
-export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onSubmit }: Props) {
+export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onSubmit, onRetry }: Props) {
   const [name, setName] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<NominatimLocation | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'pending' | 'loading' | 'error'>('idle');
   const [locationError, setLocationError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [progress, setProgress] = useState<Map<string, PhotoStatus>>(new Map());
   const [submittedPhotos, setSubmittedPhotos] = useState<PhotoForProgress[]>([]);
+  const [failedPhotos, setFailedPhotos] = useState<PhotoRowWithSource[]>([]);
 
   useEffect(() => {
     if (!open) {
@@ -91,6 +98,8 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
       setSubmitError(null);
       setProgress(new Map());
       setSubmittedPhotos([]);
+      setFailedPhotos([]);
+      setRetrying(false);
     }
   }, [open]);
 
@@ -103,7 +112,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
   );
 
   function handleOpenChange(next: boolean) {
-    if (submitting) return;
+    if (submitting || retrying) return;
     onOpenChange(next);
   }
 
@@ -124,12 +133,40 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
     };
 
     try {
-      await onSubmit({ name: name.trim(), location: selectedLocation, onPhotoProgress });
-      onOpenChange(false);
+      const result = await onSubmit({ name: name.trim(), location: selectedLocation, onPhotoProgress });
+      if (result.failedPhotos.length === 0) {
+        onOpenChange(false);
+      } else {
+        setFailedPhotos(result.failedPhotos);
+      }
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : String(err));
+      setProgress(new Map());
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRetry() {
+    if (!onRetry || failedPhotos.length === 0 || retrying) return;
+    setRetrying(true);
+    setSubmitError(null);
+
+    const onPhotoProgress = (pathLower: string, status: 'uploading' | 'done' | 'failed') => {
+      setProgress((prev) => new Map(prev).set(pathLower, status));
+    };
+
+    try {
+      const result = await onRetry({ failedPhotos, onPhotoProgress });
+      if (result.failedPhotos.length === 0) {
+        onOpenChange(false);
+      } else {
+        setFailedPhotos(result.failedPhotos);
+      }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : String(err));
     } finally {
-      setSubmitting(false);
+      setRetrying(false);
     }
   }
 
@@ -238,7 +275,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
         )}
 
         <DialogFooter>
-          {(!inProgressPhase || !submitting) && (
+          {(!inProgressPhase || (!submitting && !retrying)) && (
             <Button
               type="button"
               variant="secondary"
@@ -248,13 +285,19 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
               Cancel
             </Button>
           )}
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={inProgressPhase || !canCreate}
-          >
-            {inProgressPhase ? 'Creating…' : 'Create'}
-          </Button>
+          {!submitting && !retrying && failedPhotos.length > 0 ? (
+            <Button type="button" onClick={handleRetry}>
+              Retry failed
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={inProgressPhase || !canCreate}
+            >
+              {inProgressPhase ? 'Creating…' : 'Create'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
