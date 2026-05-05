@@ -14,6 +14,7 @@ const mockRunCreateGroupTransaction = vi.fn();
 const mockCreateD1Client = vi.fn(() => ({ query: vi.fn() }));
 const mockCreateR2Client = vi.fn(() => ({ putObject: vi.fn(), getObject: vi.fn(), deleteObject: vi.fn() }));
 const mockPersistGroup = vi.fn();
+const mockUploadPhotoToR2 = vi.fn();
 
 vi.mock('./curation', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./curation')>();
@@ -57,6 +58,10 @@ vi.mock('../cloud/d1Client', () => ({
 
 vi.mock('../cloud/r2Client', () => ({
   createR2Client: (...args: unknown[]) => mockCreateR2Client(...args),
+}));
+
+vi.mock('../cloud/photoUpload', () => ({
+  uploadPhotoToR2: (...args: unknown[]) => mockUploadPhotoToR2(...args),
 }));
 
 import { useAppStore, _resetStoreForTesting, createThumbnailCache } from './store';
@@ -104,6 +109,8 @@ beforeEach(() => {
   mockGetCfAuth.mockResolvedValue(null);
   mockRunCreateGroupTransaction.mockResolvedValue(undefined);
   mockPersistGroup.mockResolvedValue(undefined);
+  mockUploadPhotoToR2.mockReset();
+  mockUploadPhotoToR2.mockResolvedValue({ r2Key: 'photos/test' });
 });
 
 afterEach(() => {
@@ -246,6 +253,50 @@ describe('useAppStore — groups', () => {
       }),
     ).rejects.toThrow('Photo not found in flagged records:');
     expect(mockRunCreateGroupTransaction).not.toHaveBeenCalled();
+  });
+
+  it('should forward onPhotoProgress with uploading→done per photo on success', async () => {
+    useAppStore.setState({
+      cfAuth: mockCfAuth,
+      flaggedRecords: [
+        makeFlatKeep('/Photos/Lyon', 'k1', 'a.jpg', '/Photos/Lyon/a.jpg'),
+        makeFlatKeep('/Photos/Lyon', 'k2', 'b.jpg', '/Photos/Lyon/b.jpg'),
+      ],
+    });
+
+    // Make the mock orchestrator call deps.uploadPhotoToR2 for each photo row
+    type UploadDeps = { uploadPhotoToR2: (r2: unknown, input: { photoId: string; pathDisplay: string }) => Promise<unknown> };
+    mockRunCreateGroupTransaction.mockImplementation(
+      async (_group: unknown, photoRows: { dropboxPath: string }[], deps: UploadDeps) => {
+        for (const row of photoRows) {
+          await deps.uploadPhotoToR2({}, { photoId: 'test', pathDisplay: row.dropboxPath });
+        }
+      },
+    );
+
+    const emissions: Array<[string, string]> = [];
+    const onPhotoProgress = (pathLower: string, status: 'uploading' | 'done' | 'failed') => {
+      emissions.push([pathLower, status]);
+    };
+
+    const loc = { lat: 45, lng: 4, placeId: 'p1', displayName: 'Lyon, France', name: 'Lyon, France' };
+    await act(async () => {
+      await useAppStore.getState().createGroup({
+        name: 'Lyon', location: loc,
+        photos: [
+          { folderPath: '/Photos/Lyon', key: 'k1' },
+          { folderPath: '/Photos/Lyon', key: 'k2' },
+        ],
+        onPhotoProgress,
+      });
+    });
+
+    expect(emissions).toEqual([
+      ['/photos/lyon/a.jpg', 'uploading'],
+      ['/photos/lyon/a.jpg', 'done'],
+      ['/photos/lyon/b.jpg', 'uploading'],
+      ['/photos/lyon/b.jpg', 'done'],
+    ]);
   });
 
   it('removes a group via deleteGroup and clears its bucket from recordsByGroupId', async () => {

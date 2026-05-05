@@ -5,6 +5,7 @@ import type { NavigateDirection } from './PreviewPanel';
 import { FlaggedGrid } from './FlaggedGrid';
 import { useAppStore } from './store';
 import { CreateGroupModal } from './CreateGroupModal';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -197,10 +198,13 @@ export function FlaggedView({ isActive, previewWidth, isResizing = false, onPrev
           if (!next) setSelectedIndex(null);
         }}
         email={email}
-        photoCount={filtered.length}
-        onSubmit={({ name, location }) =>
-          createGroup({ name, location, photos: filtered.map(({ folderPath, key }) => ({ folderPath, key })) })
-        }
+        photos={filtered.map(({ record }) => ({ pathLower: record.pathLower, pathDisplay: record.pathDisplay, name: record.name }))}
+        cache={cache}
+        onSubmit={async ({ name, location, onPhotoProgress }) => {
+          const photoList = filtered.map(({ folderPath, key }) => ({ folderPath, key }));
+          await createGroup({ name, location, photos: photoList, onPhotoProgress });
+          toast.success(`Group created — ${photoList.length} ${photoList.length === 1 ? 'photo' : 'photos'} uploaded`);
+        }}
       />
     </div>
   );

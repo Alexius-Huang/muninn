@@ -5,6 +5,7 @@ import type { DropboxAccount } from './dropbox/client';
 import { SetupScreen } from './auth/SetupScreen';
 import { Connected } from './curator/Connected';
 import { ConfigurationPanel } from './cloud/ConfigurationPanel';
+import { Toaster } from '@/components/shadcn/sonner';
 
 type AppState =
   | { status: 'loading' }
@@ -74,10 +75,12 @@ function MainApp() {
 
 function App() {
   const params = new URLSearchParams(window.location.search);
-  if (params.get('cf') === 'debug') {
-    return <ConfigurationPanel />;
-  }
-  return <MainApp />;
+  return (
+    <>
+      <Toaster />
+      {params.get('cf') === 'debug' ? <ConfigurationPanel /> : <MainApp />}
+    </>
+  );
 }
 
 export default App;
