@@ -12,7 +12,7 @@ export type PhotoRow = {
 const GROUP_INSERT_SQL =
   'INSERT INTO groups (id, name, lat, lng, place_id, location_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)';
 const PHOTO_INSERT_SQL =
-  'INSERT INTO photos (id, group_id, name, captured_at, r2_key, created_at) VALUES (?, ?, ?, ?, ?, ?)';
+  'INSERT OR IGNORE INTO photos (id, group_id, name, captured_at, r2_key, created_at) VALUES (?, ?, ?, ?, ?, ?)';
 const GROUP_DELETE_SQL = 'DELETE FROM groups WHERE id = ?';
 
 export async function insertGroupRow(d1: D1Client, group: Group): Promise<void> {

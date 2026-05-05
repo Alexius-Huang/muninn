@@ -283,7 +283,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       );
     };
 
-    return runCreateGroupTransaction(group, photoRows, {
+    const result = await runCreateGroupTransaction(group, photoRows, {
       d1,
       r2,
       uploadPhotoToR2: wrappedUpload,
@@ -305,6 +305,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
         ]);
       },
     });
+
+    if (result.failed.length > 0) {
+      group.photoIds = result.succeeded;
+      await persistGroup(group);
+      await get().loadGrouped();
+    }
+
+    return result;
   },
 
   async deleteGroup(id) {

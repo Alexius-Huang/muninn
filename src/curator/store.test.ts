@@ -107,7 +107,7 @@ beforeEach(() => {
   mockDeleteGroupAndCascade.mockResolvedValue(undefined);
   mockGetThumbnailBatch.mockResolvedValue([]);
   mockGetCfAuth.mockResolvedValue(null);
-  mockRunCreateGroupTransaction.mockResolvedValue(undefined);
+  mockRunCreateGroupTransaction.mockResolvedValue({ succeeded: [], failed: [] });
   mockPersistGroup.mockResolvedValue(undefined);
   mockUploadPhotoToR2.mockReset();
   mockUploadPhotoToR2.mockResolvedValue({ r2Key: 'photos/test' });
@@ -267,10 +267,11 @@ describe('useAppStore — groups', () => {
     // Make the mock orchestrator call deps.uploadPhotoToR2 for each photo row
     type UploadDeps = { uploadPhotoToR2: (r2: unknown, input: { photoId: string; pathDisplay: string }) => Promise<unknown> };
     mockRunCreateGroupTransaction.mockImplementation(
-      async (_group: unknown, photoRows: { dropboxPath: string }[], deps: UploadDeps) => {
+      async (_group: unknown, photoRows: { dropboxPath: string; id: string }[], deps: UploadDeps) => {
         for (const row of photoRows) {
           await deps.uploadPhotoToR2({}, { photoId: 'test', pathDisplay: row.dropboxPath });
         }
+        return { succeeded: photoRows.map((r) => r.id), failed: [] };
       },
     );
 
@@ -297,6 +298,39 @@ describe('useAppStore — groups', () => {
       ['/photos/lyon/b.jpg', 'uploading'],
       ['/photos/lyon/b.jpg', 'done'],
     ]);
+  });
+
+  it('should trim group.photoIds to succeeded IDs and re-persist when some photos fail to upload', async () => {
+    useAppStore.setState({
+      cfAuth: mockCfAuth,
+      flaggedRecords: [
+        makeFlatKeep('/Photos/Lyon', 'k1', 'a.jpg', '/Photos/Lyon/a.jpg'),
+        makeFlatKeep('/Photos/Lyon', 'k2', 'b.jpg', '/Photos/Lyon/b.jpg'),
+      ],
+    });
+
+    let capturedSucceeded: string[] = [];
+    mockRunCreateGroupTransaction.mockImplementation(
+      async (_group: unknown, photoRows: { id: string }[]) => {
+        capturedSucceeded = [photoRows[0].id];
+        return { succeeded: [photoRows[0].id], failed: [photoRows[1].id] };
+      },
+    );
+
+    const loc = { lat: 45, lng: 4, placeId: 'p1', displayName: 'Lyon, France', name: 'Lyon, France' };
+    await act(async () => {
+      await useAppStore.getState().createGroup({
+        name: 'Lyon', location: loc,
+        photos: [
+          { folderPath: '/Photos/Lyon', key: 'k1' },
+          { folderPath: '/Photos/Lyon', key: 'k2' },
+        ],
+      });
+    });
+
+    expect(mockPersistGroup).toHaveBeenCalledOnce();
+    const [groupOnFixup] = mockPersistGroup.mock.calls[0] as [{ photoIds: string[] }];
+    expect(groupOnFixup.photoIds).toEqual(capturedSucceeded);
   });
 
   it('removes a group via deleteGroup and clears its bucket from recordsByGroupId', async () => {
