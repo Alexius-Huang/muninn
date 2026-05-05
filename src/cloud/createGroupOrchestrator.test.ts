@@ -377,7 +377,9 @@ describe('concurrency cap', () => {
     const deps = makeDeps({ uploadPhotoToR2 });
     const txPromise = runCreateGroupTransaction(makeGroup(), photos, deps);
 
-    // Drain persistLocal and insertGroupRow microtasks before uploads start
+    // Two ticks required: one per sequential `await` in the orchestrator before uploads begin
+    // (persistLocal → insertGroupRow). Each mock-resolved promise still costs one microtask
+    // tick, so we must yield twice before settledWithConcurrency starts the workers.
     await Promise.resolve();
     await Promise.resolve();
 
@@ -385,7 +387,9 @@ describe('concurrency cap', () => {
     expect(pendingResolvers.length).toBe(R2_UPLOAD_CONCURRENCY);
     expect(maxInFlight).toBe(R2_UPLOAD_CONCURRENCY);
 
-    // Drain all uploads one at a time; each resolve lets a worker pick up the next task
+    // Resolve uploads one at a time. One tick lets the resolved worker's continuation run and
+    // synchronously kick off the next upload (pushing a new resolver) before suspending again.
+    // The second tick is a safety margin in case an extra async boundary appears in future.
     while (pendingResolvers.length > 0) {
       pendingResolvers.shift()!();
       await Promise.resolve();
