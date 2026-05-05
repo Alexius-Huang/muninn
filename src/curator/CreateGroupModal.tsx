@@ -246,7 +246,7 @@ export function CreateGroupModal({ open, onOpenChange, email, photos, cache, onS
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={inProgressPhase ? submitting : !canCreate}
+            disabled={inProgressPhase || !canCreate}
           >
             {inProgressPhase ? 'Creating…' : 'Create'}
           </Button>
