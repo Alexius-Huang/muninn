@@ -202,8 +202,8 @@ export function FlaggedView({ isActive, previewWidth, isResizing = false, onPrev
         cache={cache}
         onSubmit={async ({ name, location, onPhotoProgress }) => {
           const photoList = filtered.map(({ folderPath, key }) => ({ folderPath, key }));
-          await createGroup({ name, location, photos: photoList, onPhotoProgress });
-          toast.success(`Group created — ${photoList.length} ${photoList.length === 1 ? 'photo' : 'photos'} uploaded`);
+          const { succeeded } = await createGroup({ name, location, photos: photoList, onPhotoProgress });
+          toast.success(`Group created — ${succeeded.length} ${succeeded.length === 1 ? 'photo' : 'photos'} uploaded`);
         }}
       />
     </div>

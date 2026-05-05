@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   runCreateGroupTransaction,
   R2_UPLOAD_CONCURRENCY,
+  D1PhotoInsertError,
   type OrchestratorDeps,
   type PhotoRowWithSource,
 } from './createGroupOrchestrator';
@@ -53,8 +54,8 @@ function makeDeps(overrides: Partial<OrchestratorDeps> = {}): OrchestratorDeps {
     d1: makeD1(),
     r2: makeR2(),
     uploadPhotoToR2: vi.fn().mockResolvedValue({ r2Key: 'photos/p1' }),
-    insertGroupAndPhotos: vi.fn().mockResolvedValue(undefined),
-    deleteGroupRowsFromD1: vi.fn().mockResolvedValue(undefined),
+    insertGroupRow: vi.fn().mockResolvedValue(undefined),
+    insertPhotoRows: vi.fn().mockResolvedValue(undefined),
     persistLocal: vi.fn().mockResolvedValue(undefined),
     rollbackLocal: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -81,37 +82,52 @@ describe('happy path', () => {
     expect(deps.uploadPhotoToR2).toHaveBeenCalledWith(deps.r2, { photoId: 'p3', pathDisplay: '/c.jpg' });
   });
 
-  it('should call insertGroupAndPhotos with the group and photos', async () => {
-    const group = makeGroup();
-    const photos = [makePhoto({ id: 'p1' }), makePhoto({ id: 'p2' })];
-    const deps = makeDeps();
-    await runCreateGroupTransaction(group, photos, deps);
-
-    expect(deps.insertGroupAndPhotos).toHaveBeenCalledOnce();
-    expect(deps.insertGroupAndPhotos).toHaveBeenCalledWith(deps.d1, group, photos);
-  });
-
-  it('should call persistLocal after CF writes succeed', async () => {
+  it('should insert D1 group row before any R2 upload', async () => {
     const callOrder: string[] = [];
     const photos = [makePhoto({ id: 'p1' }), makePhoto({ id: 'p2' })];
     const deps = makeDeps({
-      uploadPhotoToR2: vi.fn().mockImplementation(() => {
-        callOrder.push('upload');
-        return Promise.resolve({ r2Key: 'photos/p1' });
-      }),
-      insertGroupAndPhotos: vi.fn().mockImplementation(() => {
-        callOrder.push('d1-insert');
-        return Promise.resolve();
-      }),
-      persistLocal: vi.fn().mockImplementation(() => {
-        callOrder.push('persist-local');
-        return Promise.resolve();
-      }),
+      persistLocal: vi.fn().mockImplementation(() => { callOrder.push('persist-local'); return Promise.resolve(); }),
+      insertGroupRow: vi.fn().mockImplementation(() => { callOrder.push('d1-group-insert'); return Promise.resolve(); }),
+      uploadPhotoToR2: vi.fn().mockImplementation(() => { callOrder.push('upload'); return Promise.resolve({ r2Key: 'photos/px' }); }),
+      insertPhotoRows: vi.fn().mockImplementation(() => { callOrder.push('d1-photo-insert'); return Promise.resolve(); }),
     });
 
     await runCreateGroupTransaction(makeGroup(), photos, deps);
 
-    expect(callOrder).toEqual(['upload', 'upload', 'd1-insert', 'persist-local']);
+    expect(callOrder[0]).toBe('persist-local');
+    expect(callOrder[1]).toBe('d1-group-insert');
+    // uploads follow (may appear multiple times)
+    const uploadIdx = callOrder.indexOf('upload');
+    const groupInsertIdx = callOrder.indexOf('d1-group-insert');
+    expect(uploadIdx).toBeGreaterThan(groupInsertIdx);
+  });
+
+  it('should call insertGroupRow once with the group', async () => {
+    const group = makeGroup();
+    const deps = makeDeps();
+    await runCreateGroupTransaction(group, [makePhoto()], deps);
+
+    expect(deps.insertGroupRow).toHaveBeenCalledOnce();
+    expect(deps.insertGroupRow).toHaveBeenCalledWith(deps.d1, group);
+  });
+
+  it('should only insert D1 photo rows for succeeded R2 uploads', async () => {
+    const photos = [
+      makePhoto({ id: 'p1', dropboxPath: '/a.jpg' }),
+      makePhoto({ id: 'p2', dropboxPath: '/b.jpg' }),
+      makePhoto({ id: 'p3', dropboxPath: '/c.jpg' }),
+    ];
+    const uploadPhotoToR2 = vi.fn()
+      .mockResolvedValueOnce({ r2Key: 'photos/p1' })
+      .mockRejectedValueOnce(new Error('upload p2 failed'))
+      .mockResolvedValueOnce({ r2Key: 'photos/p3' });
+    const deps = makeDeps({ uploadPhotoToR2 });
+
+    await runCreateGroupTransaction(makeGroup(), photos, deps);
+
+    expect(deps.insertPhotoRows).toHaveBeenCalledOnce();
+    const [, calledPhotos] = (deps.insertPhotoRows as ReturnType<typeof vi.fn>).mock.calls[0] as [unknown, PhotoRowWithSource[]];
+    expect(calledPhotos.map((p) => p.id)).toEqual(['p1', 'p3']);
   });
 
   it('should not call any rollback when all phases succeed', async () => {
@@ -119,36 +135,113 @@ describe('happy path', () => {
     await runCreateGroupTransaction(makeGroup(), [makePhoto()], deps);
 
     expect(deps.r2.deleteObject).not.toHaveBeenCalled();
-    expect(deps.deleteGroupRowsFromD1).not.toHaveBeenCalled();
     expect(deps.rollbackLocal).not.toHaveBeenCalled();
   });
 
-  it('should resolve to undefined on the happy path', async () => {
+  it('should resolve with { succeeded, failed } where all succeeded on full success', async () => {
+    const photos = [
+      makePhoto({ id: 'p1' }),
+      makePhoto({ id: 'p2' }),
+      makePhoto({ id: 'p3' }),
+    ];
     const deps = makeDeps();
-    await expect(
-      runCreateGroupTransaction(makeGroup(), [makePhoto()], deps),
-    ).resolves.toBeUndefined();
+    const result = await runCreateGroupTransaction(makeGroup(), photos, deps);
+
+    expect(result).toEqual({ succeeded: ['p1', 'p2', 'p3'], failed: [] });
   });
 
-  it('should still call insertGroupAndPhotos when photos array is empty', async () => {
-    const group = makeGroup();
+  it('should resolve with empty succeeded/failed when photos array is empty', async () => {
     const deps = makeDeps();
-    await runCreateGroupTransaction(group, [], deps);
+    const result = await runCreateGroupTransaction(makeGroup(), [], deps);
 
+    expect(result).toEqual({ succeeded: [], failed: [] });
     expect(deps.uploadPhotoToR2).not.toHaveBeenCalled();
-    expect(deps.insertGroupAndPhotos).toHaveBeenCalledWith(deps.d1, group, []);
+    expect(deps.insertPhotoRows).not.toHaveBeenCalled();
   });
 });
 
-describe('phase 1 — R2 upload failure', () => {
+describe('phase 1 — local persist failure', () => {
+  it('should throw without calling insertGroupRow when persistLocal fails', async () => {
+    const deps = makeDeps({
+      persistLocal: vi.fn().mockRejectedValue(new Error('disk full')),
+    });
+
+    await expect(runCreateGroupTransaction(makeGroup(), [makePhoto()], deps)).rejects.toThrow();
+    expect(deps.insertGroupRow).not.toHaveBeenCalled();
+  });
+
+  it('should throw without calling uploadPhotoToR2 when persistLocal fails', async () => {
+    const deps = makeDeps({
+      persistLocal: vi.fn().mockRejectedValue(new Error('disk full')),
+    });
+
+    await expect(runCreateGroupTransaction(makeGroup(), [makePhoto()], deps)).rejects.toThrow();
+    expect(deps.uploadPhotoToR2).not.toHaveBeenCalled();
+  });
+
+  it('should throw an error mentioning local persistence', async () => {
+    const deps = makeDeps({
+      persistLocal: vi.fn().mockRejectedValue(new Error('no space left')),
+    });
+
+    await expect(
+      runCreateGroupTransaction(makeGroup(), [makePhoto()], deps),
+    ).rejects.toThrow(/Failed to persist group locally:/);
+  });
+});
+
+describe('phase 2 — D1 group insert failure', () => {
+  it('should call rollbackLocal when D1 group insert fails', async () => {
+    const deps = makeDeps({
+      insertGroupRow: vi.fn().mockRejectedValue(new Error('D1 error')),
+    });
+
+    await expect(runCreateGroupTransaction(makeGroup(), [makePhoto()], deps)).rejects.toThrow();
+    expect(deps.rollbackLocal).toHaveBeenCalledOnce();
+  });
+
+  it('should not call uploadPhotoToR2 when D1 group insert fails', async () => {
+    const deps = makeDeps({
+      insertGroupRow: vi.fn().mockRejectedValue(new Error('D1 error')),
+    });
+
+    await expect(runCreateGroupTransaction(makeGroup(), [makePhoto()], deps)).rejects.toThrow();
+    expect(deps.uploadPhotoToR2).not.toHaveBeenCalled();
+  });
+
+  it('should throw an error mentioning D1', async () => {
+    const deps = makeDeps({
+      insertGroupRow: vi.fn().mockRejectedValue(new Error('boom')),
+    });
+
+    await expect(
+      runCreateGroupTransaction(makeGroup(), [makePhoto()], deps),
+    ).rejects.toThrow(/Failed to write group metadata to D1: boom/);
+  });
+
+  it('should still throw the originating error when rollbackLocal also fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const deps = makeDeps({
+      insertGroupRow: vi.fn().mockRejectedValue(new Error('D1 boom')),
+      rollbackLocal: vi.fn().mockRejectedValue(new Error('rollback also failed')),
+    });
+
+    await expect(
+      runCreateGroupTransaction(makeGroup(), [makePhoto()], deps),
+    ).rejects.toThrow(/Failed to write group metadata to D1: D1 boom/);
+    expect(console.warn).toHaveBeenCalled();
+  });
+});
+
+describe('phase 3 — R2 partial failure (best-effort)', () => {
   it.each([
-    ['first photo fails', [false, true, true], ['p2', 'p3']],
-    ['last photo fails', [true, true, false], ['p1', 'p2']],
-    ['multiple fail in middle', [true, false, true, false, true], ['p1', 'p3', 'p5']],
-    ['all fail', [false, false, false], []],
+    ['first photo fails', [false, true, true], ['p2', 'p3'], ['p1']],
+    ['last photo fails', [true, true, false], ['p1', 'p2'], ['p3']],
+    ['multiple fail in middle', [true, false, true, false, true], ['p1', 'p3', 'p5'], ['p2', 'p4']],
+    ['all fail', [false, false, false], [], ['p1', 'p2', 'p3']],
   ] as const)(
-    'should delete only the fulfilled R2 objects when %s',
-    async (_label, succeedFlags, expectedDeletedIds) => {
+    'should partition succeeded/failed correctly when %s',
+    async (_label, succeedFlags, expectedSucceeded, expectedFailed) => {
       const photos = succeedFlags.map((_, i) =>
         makePhoto({ id: `p${i + 1}`, dropboxPath: `/p${i + 1}.jpg` }),
       );
@@ -160,143 +253,102 @@ describe('phase 1 — R2 upload failure', () => {
       });
       const deps = makeDeps({ uploadPhotoToR2 });
 
-      await expect(runCreateGroupTransaction(makeGroup(), photos, deps)).rejects.toThrow();
+      const result = await runCreateGroupTransaction(makeGroup(), photos, deps);
 
-      expect(deps.r2.deleteObject).toHaveBeenCalledTimes(expectedDeletedIds.length);
-      for (const id of expectedDeletedIds) {
-        expect(deps.r2.deleteObject).toHaveBeenCalledWith(`photos/${id}`);
-      }
+      expect(result.succeeded).toEqual(expect.arrayContaining(expectedSucceeded));
+      expect(result.succeeded).toHaveLength(expectedSucceeded.length);
+      expect(result.failed).toEqual(expect.arrayContaining(expectedFailed));
+      expect(result.failed).toHaveLength(expectedFailed.length);
     },
   );
 
-  it('should not call insertGroupAndPhotos when R2 fails', async () => {
-    const deps = makeDeps({
-      uploadPhotoToR2: vi.fn().mockRejectedValue(new Error('R2 error')),
-    });
-
-    await expect(runCreateGroupTransaction(makeGroup(), [makePhoto()], deps)).rejects.toThrow();
-    expect(deps.insertGroupAndPhotos).not.toHaveBeenCalled();
-  });
-
-  it('should not call persistLocal when R2 fails', async () => {
-    const deps = makeDeps({
-      uploadPhotoToR2: vi.fn().mockRejectedValue(new Error('R2 error')),
-    });
-
-    await expect(runCreateGroupTransaction(makeGroup(), [makePhoto()], deps)).rejects.toThrow();
-    expect(deps.persistLocal).not.toHaveBeenCalled();
-  });
-
-  it('should throw an error mentioning the count of failed uploads', async () => {
-    const photos = Array.from({ length: 5 }, (_, i) =>
-      makePhoto({ id: `p${i + 1}`, dropboxPath: `/p${i + 1}.jpg` }),
-    );
-    let callCount = 0;
-    const uploadPhotoToR2 = vi.fn().mockImplementation(() => {
-      callCount++;
-      return callCount <= 2
-        ? Promise.resolve({ r2Key: 'photos/px' })
-        : Promise.reject(new Error('upload failed'));
-    });
-    const deps = makeDeps({ uploadPhotoToR2 });
-
-    await expect(
-      runCreateGroupTransaction(makeGroup(), photos, deps),
-    ).rejects.toThrow(/Failed to upload 3 of 5 photos to R2:/);
-  });
-
-  it('should include the first rejection reason in the error message', async () => {
+  it('should not roll back local persist on R2 partial failure', async () => {
     const photos = [makePhoto({ id: 'p1' }), makePhoto({ id: 'p2' })];
-    const uploadPhotoToR2 = vi.fn().mockRejectedValue(new Error('R2 503'));
+    const uploadPhotoToR2 = vi.fn()
+      .mockResolvedValueOnce({ r2Key: 'photos/p1' })
+      .mockRejectedValueOnce(new Error('upload p2 failed'));
     const deps = makeDeps({ uploadPhotoToR2 });
 
-    await expect(
-      runCreateGroupTransaction(makeGroup(), photos, deps),
-    ).rejects.toThrow(/R2 503/);
+    await runCreateGroupTransaction(makeGroup(), photos, deps);
+
+    expect(deps.rollbackLocal).not.toHaveBeenCalled();
+    expect(deps.r2.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('should not throw when some R2 uploads fail', async () => {
+    const photos = [makePhoto({ id: 'p1' }), makePhoto({ id: 'p2' })];
+    const uploadPhotoToR2 = vi.fn()
+      .mockResolvedValueOnce({ r2Key: 'photos/p1' })
+      .mockRejectedValueOnce(new Error('upload p2 failed'));
+    const deps = makeDeps({ uploadPhotoToR2 });
+
+    await expect(runCreateGroupTransaction(makeGroup(), photos, deps)).resolves.toBeDefined();
+  });
+
+  it('should not call insertPhotoRows when all R2 uploads fail', async () => {
+    const deps = makeDeps({
+      uploadPhotoToR2: vi.fn().mockRejectedValue(new Error('R2 error')),
+    });
+
+    await runCreateGroupTransaction(makeGroup(), [makePhoto()], deps);
+    expect(deps.insertPhotoRows).not.toHaveBeenCalled();
   });
 });
 
-describe('phase 2 — D1 insert failure', () => {
-  it('should delete all R2 objects when D1 insert fails', async () => {
+describe('phase 4 — D1 photo insert retry', () => {
+  it('should retry D1 batch photo insert up to 3 times with exponential backoff', async () => {
+    vi.useFakeTimers();
+    const insertPhotoRows = vi.fn().mockRejectedValue(new Error('D1 transient'));
+    const deps = makeDeps({ insertPhotoRows });
+
+    const txPromise = runCreateGroupTransaction(makeGroup(), [makePhoto()], deps).catch(() => {});
+    await vi.advanceTimersByTimeAsync(500 + 1000 + 2000 + 1);
+
+    await txPromise;
+    // 1 initial attempt + 3 retries = 4 total calls
+    expect(insertPhotoRows).toHaveBeenCalledTimes(4);
+    vi.useRealTimers();
+  });
+
+  it('should throw with succeeded R2 photo IDs when D1 batch insert exhausts retries', async () => {
+    vi.useFakeTimers();
     const photos = [
-      makePhoto({ id: 'p1' }),
-      makePhoto({ id: 'p2' }),
-      makePhoto({ id: 'p3' }),
+      makePhoto({ id: 'p1', dropboxPath: '/a.jpg' }),
+      makePhoto({ id: 'p2', dropboxPath: '/b.jpg' }),
+      makePhoto({ id: 'p3', dropboxPath: '/c.jpg' }),
     ];
-    const deps = makeDeps({
-      insertGroupAndPhotos: vi.fn().mockRejectedValue(new Error('D1 error')),
-    });
+    const uploadPhotoToR2 = vi.fn()
+      .mockResolvedValueOnce({ r2Key: 'photos/p1' })
+      .mockRejectedValueOnce(new Error('upload p2 failed'))
+      .mockResolvedValueOnce({ r2Key: 'photos/p3' });
+    const insertPhotoRows = vi.fn().mockRejectedValue(new Error('D1 down'));
+    const deps = makeDeps({ uploadPhotoToR2, insertPhotoRows });
 
-    await expect(runCreateGroupTransaction(makeGroup(), photos, deps)).rejects.toThrow();
+    // Attach catch immediately to prevent unhandled-rejection warnings
+    let caughtError: unknown;
+    const txPromise = runCreateGroupTransaction(makeGroup(), photos, deps).catch(e => { caughtError = e; });
+    await vi.advanceTimersByTimeAsync(500 + 1000 + 2000 + 1);
+    await txPromise;
 
-    expect(deps.r2.deleteObject).toHaveBeenCalledWith('photos/p1');
-    expect(deps.r2.deleteObject).toHaveBeenCalledWith('photos/p2');
-    expect(deps.r2.deleteObject).toHaveBeenCalledWith('photos/p3');
+    expect(caughtError).toBeInstanceOf(D1PhotoInsertError);
+    expect((caughtError as D1PhotoInsertError).succeededR2PhotoIds).toEqual(['p1', 'p3']);
+    vi.useRealTimers();
   });
 
-  it('should delete the group row when D1 insert fails', async () => {
-    const group = makeGroup({ id: 'grp-42' });
-    const deps = makeDeps({
-      insertGroupAndPhotos: vi.fn().mockRejectedValue(new Error('D1 error')),
-    });
+  it('should resolve successfully when D1 photo insert succeeds on a retry', async () => {
+    vi.useFakeTimers();
+    const insertPhotoRows = vi.fn()
+      .mockRejectedValueOnce(new Error('transient'))
+      .mockResolvedValueOnce(undefined);
+    const deps = makeDeps({ insertPhotoRows });
 
-    await expect(runCreateGroupTransaction(group, [makePhoto()], deps)).rejects.toThrow();
+    const txPromise = runCreateGroupTransaction(makeGroup(), [makePhoto()], deps);
+    await vi.advanceTimersByTimeAsync(500 + 1);
 
-    expect(deps.deleteGroupRowsFromD1).toHaveBeenCalledWith(deps.d1, 'grp-42');
-  });
-
-  it('should not call persistLocal when D1 fails', async () => {
-    const deps = makeDeps({
-      insertGroupAndPhotos: vi.fn().mockRejectedValue(new Error('D1 error')),
-    });
-
-    await expect(runCreateGroupTransaction(makeGroup(), [makePhoto()], deps)).rejects.toThrow();
-    expect(deps.persistLocal).not.toHaveBeenCalled();
-  });
-
-  it('should throw an error mentioning D1', async () => {
-    const deps = makeDeps({
-      insertGroupAndPhotos: vi.fn().mockRejectedValue(new Error('boom')),
-    });
-
-    await expect(
-      runCreateGroupTransaction(makeGroup(), [makePhoto()], deps),
-    ).rejects.toThrow(/Failed to write group metadata to D1: boom/);
-  });
-});
-
-describe('phase 3 — local persistence failure', () => {
-  it('should run cloud rollback (R2 + D1) when persistLocal throws', async () => {
-    const photos = [makePhoto({ id: 'p1' }), makePhoto({ id: 'p2' })];
-    const group = makeGroup({ id: 'grp-1' });
-    const deps = makeDeps({
-      persistLocal: vi.fn().mockRejectedValue(new Error('local error')),
-    });
-
-    await expect(runCreateGroupTransaction(group, photos, deps)).rejects.toThrow();
-
-    expect(deps.r2.deleteObject).toHaveBeenCalledWith('photos/p1');
-    expect(deps.r2.deleteObject).toHaveBeenCalledWith('photos/p2');
-    expect(deps.deleteGroupRowsFromD1).toHaveBeenCalledWith(deps.d1, 'grp-1');
-  });
-
-  it('should call rollbackLocal when persistLocal throws', async () => {
-    const deps = makeDeps({
-      persistLocal: vi.fn().mockRejectedValue(new Error('local error')),
-    });
-
-    await expect(runCreateGroupTransaction(makeGroup(), [makePhoto()], deps)).rejects.toThrow();
-    expect(deps.rollbackLocal).toHaveBeenCalledOnce();
-  });
-
-  it('should throw an error mentioning local persistence', async () => {
-    const deps = makeDeps({
-      persistLocal: vi.fn().mockRejectedValue(new Error('disk full')),
-    });
-
-    await expect(
-      runCreateGroupTransaction(makeGroup(), [makePhoto()], deps),
-    ).rejects.toThrow(/Failed to persist group locally:/);
+    const result = await txPromise;
+    expect(result).toEqual({ succeeded: ['p1'], failed: [] });
+    expect(insertPhotoRows).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 });
 
@@ -325,7 +377,11 @@ describe('concurrency cap', () => {
     const deps = makeDeps({ uploadPhotoToR2 });
     const txPromise = runCreateGroupTransaction(makeGroup(), photos, deps);
 
-    // Workers start synchronously — exactly R2_UPLOAD_CONCURRENCY are in-flight before any await
+    // Drain persistLocal and insertGroupRow microtasks before uploads start
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Workers have now started — exactly R2_UPLOAD_CONCURRENCY are in-flight
     expect(pendingResolvers.length).toBe(R2_UPLOAD_CONCURRENCY);
     expect(maxInFlight).toBe(R2_UPLOAD_CONCURRENCY);
 
@@ -344,66 +400,16 @@ describe('concurrency cap', () => {
 });
 
 describe('rollback robustness', () => {
-  it('should still throw the originating error when an R2 rollback DELETE fails', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const photos = [
-      makePhoto({ id: 'p1' }),
-      makePhoto({ id: 'p2' }),
-      makePhoto({ id: 'p3' }),
-    ];
-    const uploadPhotoToR2 = vi.fn()
-      .mockResolvedValueOnce({ r2Key: 'photos/p1' })
-      .mockResolvedValueOnce({ r2Key: 'photos/p2' })
-      .mockRejectedValueOnce(new Error('upload p3 failed'));
-    const r2 = makeR2();
-    (r2.deleteObject as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('delete failed'));
-    const deps = makeDeps({ uploadPhotoToR2, r2 });
-
-    await expect(
-      runCreateGroupTransaction(makeGroup(), photos, deps),
-    ).rejects.toThrow(/Failed to upload 1 of 3 photos to R2:/);
-    expect(console.warn).toHaveBeenCalled();
-  });
-
-  it('should still throw the originating error when the D1 rollback DELETE fails', async () => {
+  it('should warn but not throw when rollbackLocal fails during D1 group insert failure', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const deps = makeDeps({
-      insertGroupAndPhotos: vi.fn().mockRejectedValue(new Error('D1 boom')),
-      deleteGroupRowsFromD1: vi.fn().mockRejectedValue(new Error('delete row failed')),
+      insertGroupRow: vi.fn().mockRejectedValue(new Error('D1 group error')),
+      rollbackLocal: vi.fn().mockRejectedValue(new Error('rollback failed')),
     });
 
     await expect(
       runCreateGroupTransaction(makeGroup(), [makePhoto()], deps),
-    ).rejects.toThrow(/Failed to write group metadata to D1: D1 boom/);
+    ).rejects.toThrow(/Failed to write group metadata to D1: D1 group error/);
     expect(console.warn).toHaveBeenCalled();
-  });
-
-  it('should still throw the originating error when rollbackLocal throws', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const deps = makeDeps({
-      persistLocal: vi.fn().mockRejectedValue(new Error('local fail')),
-      rollbackLocal: vi.fn().mockRejectedValue(new Error('rollback also failed')),
-    });
-
-    await expect(
-      runCreateGroupTransaction(makeGroup(), [makePhoto()], deps),
-    ).rejects.toThrow(/Failed to persist group locally: local fail/);
-    expect(console.warn).toHaveBeenCalled();
-  });
-
-  it('should not throw the rollback failure even if multiple rollback steps fail', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const r2 = makeR2();
-    (r2.deleteObject as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('r2 delete fail'));
-    const deps = makeDeps({
-      r2,
-      persistLocal: vi.fn().mockRejectedValue(new Error('local fail')),
-      deleteGroupRowsFromD1: vi.fn().mockRejectedValue(new Error('d1 delete fail')),
-      rollbackLocal: vi.fn().mockRejectedValue(new Error('rollbackLocal fail')),
-    });
-
-    await expect(
-      runCreateGroupTransaction(makeGroup(), [makePhoto()], deps),
-    ).rejects.toThrow(/Failed to persist group locally: local fail/);
   });
 });

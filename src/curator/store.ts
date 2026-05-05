@@ -9,7 +9,7 @@ import { createD1Client } from '../cloud/d1Client';
 import { createR2Client } from '../cloud/r2Client';
 import { runCreateGroupTransaction, type PhotoRowWithSource } from '../cloud/createGroupOrchestrator';
 import { uploadPhotoToR2 } from '../cloud/photoUpload';
-import { insertGroupAndPhotos, deleteGroupRowsFromD1 } from '../cloud/groupWrites';
+import { insertGroupRow, insertPhotoRows } from '../cloud/groupWrites';
 
 // ---------------------------------------------------------------------------
 // Thumbnail cache
@@ -186,7 +186,7 @@ type AppStore = {
     location: NominatimLocation;
     photos: { folderPath: string; key: string }[];
     onPhotoProgress?: (pathLower: string, status: 'uploading' | 'done' | 'failed') => void;
-  }) => Promise<void>;
+  }) => Promise<{ succeeded: string[]; failed: string[] }>;
   deleteGroup: (id: string) => Promise<void>;
 
   // grouped records (groupId → photos)
@@ -283,12 +283,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       );
     };
 
-    await runCreateGroupTransaction(group, photoRows, {
+    return runCreateGroupTransaction(group, photoRows, {
       d1,
       r2,
       uploadPhotoToR2: wrappedUpload,
-      insertGroupAndPhotos,
-      deleteGroupRowsFromD1,
+      insertGroupRow,
+      insertPhotoRows,
       persistLocal: async () => {
         await persistGroup(group);
         await get().assignGroupId(photos, group.id);
