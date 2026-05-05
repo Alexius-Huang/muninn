@@ -80,3 +80,39 @@ export async function deleteGroupRowsFromD1(
 ): Promise<void> {
   await d1.query(GROUP_DELETE_SQL, [groupId]);
 }
+
+type GroupJoinRow = {
+  group_id: string;
+  group_name: string;
+  lat: number;
+  lng: number;
+  place_id: string | null;
+  location_name: string | null;
+  created_at: string;
+  photo_id: string | null;
+};
+
+export const SELECT_GROUPS_SQL = `SELECT g.id AS group_id, g.name AS group_name, g.lat AS lat, g.lng AS lng, g.place_id AS place_id, g.location_name AS location_name, g.created_at AS created_at, p.id AS photo_id FROM groups g LEFT JOIN photos p ON p.group_id = g.id ORDER BY g.created_at DESC`;
+
+export async function selectAllGroups(d1: D1Client): Promise<Group[]> {
+  const rows = (await d1.query(SELECT_GROUPS_SQL, [])) as GroupJoinRow[];
+  const map = new Map<string, Group>();
+  for (const row of rows) {
+    if (!map.has(row.group_id)) {
+      map.set(row.group_id, {
+        id: row.group_id,
+        name: row.group_name,
+        lat: row.lat,
+        lng: row.lng,
+        placeId: row.place_id ?? undefined,
+        locationName: row.location_name ?? undefined,
+        createdAt: row.created_at,
+        photoIds: [],
+      });
+    }
+    if (row.photo_id !== null) {
+      map.get(row.group_id)!.photoIds.push(row.photo_id);
+    }
+  }
+  return Array.from(map.values());
+}

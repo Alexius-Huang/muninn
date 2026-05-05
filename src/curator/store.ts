@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { getThumbnailBatch } from '../dropbox/client';
 import { listCuration, writeCuration, transitionToGroup, type CurationFile, type CurationRecord, type Flag } from './curation';
-import { readGroups, deleteGroupAndCascade, createGroup as makeGroup, persistGroup } from './groups';
+import { deleteGroupAndCascade, createGroup as makeGroup, persistGroup } from './groups';
 import type { Group } from './groups';
 import type { NominatimLocation } from '@/components/NominatimSearch';
 import { getCfAuth, type CfAuth } from '../cloud/cfAuth';
@@ -9,7 +9,7 @@ import { createD1Client } from '../cloud/d1Client';
 import { createR2Client } from '../cloud/r2Client';
 import { runCreateGroupTransaction, type PhotoRowWithSource } from '../cloud/createGroupOrchestrator';
 import { uploadPhotoToR2 } from '../cloud/photoUpload';
-import { insertGroupRow, insertPhotoRows } from '../cloud/groupWrites';
+import { insertGroupRow, insertPhotoRows, selectAllGroups } from '../cloud/groupWrites';
 
 // ---------------------------------------------------------------------------
 // Thumbnail cache
@@ -236,7 +236,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
   groups: [],
 
   async loadGroups() {
-    const groups = await readGroups();
+    const cfAuth = get().cfAuth;
+    if (cfAuth === null) {
+      set({ groups: [] });
+      return;
+    }
+    const d1 = createD1Client(cfAuth);
+    const groups = await selectAllGroups(d1);
     set({ groups });
   },
 

@@ -100,6 +100,8 @@ beforeEach(() => {
   mockGetCfAuth.mockReset();
   mockRunCreateGroupTransaction.mockReset();
   mockPersistGroup.mockReset();
+  mockCreateD1Client.mockReset();
+  mockCreateD1Client.mockImplementation(() => ({ query: vi.fn() }));
   mockListCuration.mockResolvedValue([]);
   mockWriteCuration.mockResolvedValue(undefined);
   mockReadGroups.mockResolvedValue([]);
@@ -122,11 +124,26 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('useAppStore — groups', () => {
-  it('hydrates groups via loadGroups', async () => {
-    const group = { id: 'g1', name: 'Paris', lat: 48, lng: 2, photoIds: [] };
-    mockReadGroups.mockResolvedValue([group]);
+  it('hydrates groups via loadGroups from D1', async () => {
+    const rows = [
+      { group_id: 'g1', group_name: 'Paris', lat: 48, lng: 2, place_id: null, location_name: null, created_at: '2026-01-01T00:00:00.000Z', photo_id: 'p1' },
+      { group_id: 'g1', group_name: 'Paris', lat: 48, lng: 2, place_id: null, location_name: null, created_at: '2026-01-01T00:00:00.000Z', photo_id: 'p2' },
+    ];
+    const mockQuery = vi.fn().mockResolvedValue(rows);
+    mockCreateD1Client.mockReturnValue({ query: mockQuery });
+    useAppStore.setState({ cfAuth: mockCfAuth });
     await act(async () => { await useAppStore.getState().loadGroups(); });
-    expect(useAppStore.getState().groups).toEqual([group]);
+    expect(mockCreateD1Client).toHaveBeenCalledWith(mockCfAuth);
+    expect(useAppStore.getState().groups).toEqual([
+      { id: 'g1', name: 'Paris', lat: 48, lng: 2, placeId: undefined, locationName: undefined, createdAt: '2026-01-01T00:00:00.000Z', photoIds: ['p1', 'p2'] },
+    ]);
+  });
+
+  it('returns empty groups when cfAuth is null', async () => {
+    useAppStore.setState({ cfAuth: null });
+    await act(async () => { await useAppStore.getState().loadGroups(); });
+    expect(useAppStore.getState().groups).toEqual([]);
+    expect(mockCreateD1Client).not.toHaveBeenCalled();
   });
 
   const mockCfAuth = {

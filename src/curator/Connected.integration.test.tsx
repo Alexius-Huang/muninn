@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Connected } from './Connected';
-import { _resetStoreForTesting } from './store';
+import { _resetStoreForTesting, useAppStore } from './store';
 
 const mockDisconnect = vi.fn();
 const mockReadCuration = vi.fn();
@@ -11,6 +11,8 @@ const mockWriteCuration = vi.fn();
 const mockListCuration = vi.fn();
 const mockReadGroups = vi.fn();
 const mockDeleteGroupAndCascade = vi.fn();
+const mockGetCfAuth = vi.fn().mockResolvedValue(null);
+const mockCreateD1Client = vi.fn();
 
 vi.mock('./store', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./store')>();
@@ -48,7 +50,11 @@ vi.mock('./groups', async (importOriginal) => {
 });
 
 vi.mock('../cloud/cfAuth', () => ({
-  getCfAuth: vi.fn().mockResolvedValue(null),
+  getCfAuth: (...args: unknown[]) => mockGetCfAuth(...args),
+}));
+
+vi.mock('../cloud/d1Client', () => ({
+  createD1Client: (...args: unknown[]) => mockCreateD1Client(...args),
 }));
 
 beforeAll(() => {
@@ -95,6 +101,10 @@ beforeEach(() => {
   mockReadGroups.mockResolvedValue([]);
   mockDeleteGroupAndCascade.mockReset();
   mockDeleteGroupAndCascade.mockResolvedValue(undefined);
+  mockGetCfAuth.mockReset();
+  mockGetCfAuth.mockResolvedValue(null);
+  mockCreateD1Client.mockReset();
+  mockCreateD1Client.mockImplementation(() => ({ query: vi.fn().mockResolvedValue([]) }));
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
@@ -102,21 +112,22 @@ describe('Connected > delete group cascade (MUN-37)', () => {
   it('should invoke deleteGroupAndCascade, re-fetch groups, and remove the group from the list', async () => {
     const user = userEvent.setup();
 
-    const group = {
-      id: 'g1',
-      name: 'Eiffel Tower',
-      lat: 48.858,
-      lng: 2.294,
-      placeId: 'p1',
-      locationName: 'Paris, France',
-      photoIds: ['id-a'],
-      createdAt: '2026-01-01T00:00:00.000Z',
+    const validCfAuth = {
+      accountId: 'acct', d1ApiToken: 'tok', d1DatabaseId: 'db',
+      r2AccessKeyId: 'key', r2SecretAccessKey: 'secret', r2Bucket: 'bucket',
     };
+    mockGetCfAuth.mockResolvedValue(validCfAuth);
+    useAppStore.setState({ cfAuth: validCfAuth });
 
-    // First call: group exists; second call (after delete): empty list
-    mockReadGroups
-      .mockResolvedValueOnce([group])
+    const groupRow = {
+      group_id: 'g1', group_name: 'Eiffel Tower', lat: 48.858, lng: 2.294,
+      place_id: 'p1', location_name: 'Paris, France',
+      created_at: '2026-01-01T00:00:00.000Z', photo_id: 'id-a',
+    };
+    const mockQuery = vi.fn()
+      .mockResolvedValueOnce([groupRow])
       .mockResolvedValue([]);
+    mockCreateD1Client.mockReturnValue({ query: mockQuery });
     mockListCuration.mockResolvedValue([]);
 
     render(<Connected account={FAKE_ACCOUNT} onDisconnect={vi.fn()} />);
@@ -142,8 +153,8 @@ describe('Connected > delete group cascade (MUN-37)', () => {
     // deleteGroupAndCascade was called with the correct id
     await waitFor(() => expect(mockDeleteGroupAndCascade).toHaveBeenCalledWith('g1'));
 
-    // Groups list re-fetched (once on mount, once after delete)
-    await waitFor(() => expect(mockReadGroups).toHaveBeenCalledTimes(2));
+    // D1 was re-queried after delete (once on mount, once after delete)
+    await waitFor(() => expect(mockQuery).toHaveBeenCalledTimes(2));
 
     // The deleted group no longer appears
     await waitFor(() =>
