@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { insertGroupAndPhotos, deleteGroupRowsFromD1, type PhotoRow } from './groupWrites';
+import { insertGroupAndPhotos, deleteGroupRowsFromD1, selectAllGroups, SELECT_GROUPS_SQL, type PhotoRow } from './groupWrites';
 import type { D1Client } from './d1Client';
 import type { Group } from '../curator/groups';
 
@@ -174,5 +174,77 @@ describe('deleteGroupRowsFromD1', () => {
     const d1 = makeD1(query);
 
     await expect(deleteGroupRowsFromD1(d1, 'group-1')).rejects.toThrow(err);
+  });
+});
+
+describe('selectAllGroups', () => {
+  it.each([
+    [
+      'N photo rows for one group → one Group with photoIds.length === N',
+      [
+        { group_id: 'g1', group_name: 'Paris', lat: 48, lng: 2, place_id: null, location_name: null, created_at: '2026-01-01T00:00:00.000Z', photo_id: 'p1' },
+        { group_id: 'g1', group_name: 'Paris', lat: 48, lng: 2, place_id: null, location_name: null, created_at: '2026-01-01T00:00:00.000Z', photo_id: 'p2' },
+        { group_id: 'g1', group_name: 'Paris', lat: 48, lng: 2, place_id: null, location_name: null, created_at: '2026-01-01T00:00:00.000Z', photo_id: 'p3' },
+      ],
+      (groups: Awaited<ReturnType<typeof selectAllGroups>>) => {
+        expect(groups).toHaveLength(1);
+        expect(groups[0].photoIds).toHaveLength(3);
+        expect(groups[0].photoIds).toEqual(['p1', 'p2', 'p3']);
+      },
+    ],
+    [
+      'photo_id NULL (LEFT JOIN sentinel) → Group with photoIds === []',
+      [
+        { group_id: 'g1', group_name: 'Paris', lat: 48, lng: 2, place_id: null, location_name: null, created_at: '2026-01-01T00:00:00.000Z', photo_id: null },
+      ],
+      (groups: Awaited<ReturnType<typeof selectAllGroups>>) => {
+        expect(groups).toHaveLength(1);
+        expect(groups[0].photoIds).toEqual([]);
+      },
+    ],
+    [
+      'nullable place_id / location_name → placeId and locationName are undefined',
+      [
+        { group_id: 'g1', group_name: 'Paris', lat: 48, lng: 2, place_id: null, location_name: null, created_at: '2026-01-01T00:00:00.000Z', photo_id: null },
+      ],
+      (groups: Awaited<ReturnType<typeof selectAllGroups>>) => {
+        expect(groups[0].placeId).toBeUndefined();
+        expect(groups[0].locationName).toBeUndefined();
+      },
+    ],
+    [
+      'non-null place_id / location_name → placeId and locationName are populated',
+      [
+        { group_id: 'g1', group_name: 'Paris', lat: 48, lng: 2, place_id: 'place-abc', location_name: 'Paris, France', created_at: '2026-01-01T00:00:00.000Z', photo_id: null },
+      ],
+      (groups: Awaited<ReturnType<typeof selectAllGroups>>) => {
+        expect(groups[0].placeId).toBe('place-abc');
+        expect(groups[0].locationName).toBe('Paris, France');
+      },
+    ],
+    [
+      'preserves ORDER BY created_at DESC across multiple groups',
+      [
+        { group_id: 'g2', group_name: 'Rome', lat: 41, lng: 12, place_id: null, location_name: null, created_at: '2026-03-01T00:00:00.000Z', photo_id: null },
+        { group_id: 'g1', group_name: 'Paris', lat: 48, lng: 2, place_id: null, location_name: null, created_at: '2026-01-01T00:00:00.000Z', photo_id: null },
+      ],
+      (groups: Awaited<ReturnType<typeof selectAllGroups>>) => {
+        expect(groups).toHaveLength(2);
+        expect(groups[0].id).toBe('g2');
+        expect(groups[1].id).toBe('g1');
+      },
+    ],
+  ] as const)('%s', async (_label, rows, assert) => {
+    const query = vi.fn().mockResolvedValue(rows);
+    const d1 = makeD1(query);
+    const groups = await selectAllGroups(d1);
+    assert(groups);
+  });
+
+  it('calls d1.query with SELECT_GROUPS_SQL and empty params', async () => {
+    const query = vi.fn().mockResolvedValue([]);
+    const d1 = makeD1(query);
+    await selectAllGroups(d1);
+    expect(query).toHaveBeenCalledWith(SELECT_GROUPS_SQL, []);
   });
 });
